@@ -1,0 +1,16 @@
+data_folder:
+  path: ../waymo_data/
+#@markdown #### Replace this path with your own tfrecords. A tfrecord containing tf.Example protos as downloaded from the Waymo dataset webpage.
+FILE_NAME: '/content/waymo-open-dataset/tutorial/.../tfexample.tfrecord' #@param {type:"string"}
+#@markdown #### Replace this directory with your own dataset folder for evaluation.
+EVAL_DIR: '/dataset_path/validation/' #@param {type: "string"}
+EVAL_RUNS: ['segment-1024360143612057520_3580_000_3600_000_with_camera_labels.tfrecord','segment-11048712972908676520_545_000_565_000_with_camera_labels.tfrecord'] #@param {type: "raw"}
+
+#@markdown #### Replace this path with the real path. Each line of the file is the "\, \" of a frame with camera segmentation labels.
+TEST_SET_SOURCE: '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt' #@param {type: "string"} 
+
+#@markdown #### Replace this directory with your own testing dataset folder.
+TEST_DIR: '/dataset_path/testing/' #@param {type: "string"}
+
+#@markdown #### Replace this directory with your own local folder saving the submission.
+SAVE_FOLDER: '/tmp/camera_segmentation_challenge/testing/' #@param {type: "string"}
