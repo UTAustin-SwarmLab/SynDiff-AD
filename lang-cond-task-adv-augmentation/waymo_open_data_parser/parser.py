@@ -47,7 +47,7 @@ def load_dataset_proto(config: omegaconf) -> List:
     return frames_with_seg
 
 
-def organise_segment_data_proto(config: omegaconf, frames_with_seg: list) -> List:
+def organise_segment_data(config: omegaconf, frames_with_seg: list) -> List:
     '''
     Organsie the images by the order of the cameras that took the images
 
@@ -72,10 +72,10 @@ def organise_segment_data_proto(config: omegaconf, frames_with_seg: list) -> Lis
     return segmentation_protos_ordered
 
 
-def read(config, context_name: str, tag: str, dataset_dir: str = EVAL_DIR) -> dd.DataFrame:
+def read(config,  tag: str, context_name: str,) -> dd.DataFrame:
   """Creates a Dask DataFrame for the component specified by its tag."""
   
-  paths = f'{dataset_dir}/{tag}/{context_name}.parquet'
+  paths = f'{config.FILE_NAME}/{tag}/{context_name}.parquet'
   return dd.read_parquet(paths)
 
 
@@ -88,8 +88,8 @@ def ungroup_row(key_names: Sequence[str],
     for values in zip(*cells):
         yield dict(zip(cols, values), **keys)
 
-def load_data_set_parquet(config, context_name: str) ->\
-        Tuple(List[open_dataset.CameraImage], List[open_dataset.CameraSegmentationLabel]):
+def load_data_set_parquet(config: omegaconf, context_name: str) ->\
+        Tuple[List[open_dataset.CameraImage], List[open_dataset.CameraSegmentationLabel]]:
     '''
     Load datset from parquet files
     
@@ -100,12 +100,9 @@ def load_data_set_parquet(config, context_name: str) ->\
      
        cam_segmentation_list: List of segmentation labels ordered by the camera order
     '''
-    context_name = '550171902340535682_2640_000_2660_000'
 
-
-
-    cam_segmentation_df = read('camera_segmentation')
-    cam_images_df = read('camera_images')
+    cam_segmentation_df = read(config, 'segmentation', context_name)
+    cam_images_df = read(config, 'image', context_name)
 
     # Group segmentation labels into frames by context name and timestamp.
     frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
@@ -125,20 +122,19 @@ def load_data_set_parquet(config, context_name: str) ->\
 
     cam_list = []
     #TODO: need to figure out what the function is to obtain camera images
-    for i, (key_values, r) in enumerate(cam_images_per_frame_df.iterrows()):
-        # Read three sequences of 5 camera images for this demo.
-        # Store a segmentation label component for each camera.
-        cam_list.append(
-            [v2.CameraSegmentationLabelComponent.from_dict(d) 
-            for d in ungroup_row(frame_keys, key_values, r)])
+    # for i, (key_values, r) in enumerate(cam_images_per_frame_df.iterrows()):
+    #     # Read three sequences of 5 camera images for this demo.
+    #     # Store a segmentation label component for each camera.
+    #     cam_list.append(
+    #         [v2.CameraSegmentationLabelComponent.from_dict(d) 
+    #         for d in ungroup_row(frame_keys, key_values, r)])
         
     return cam_segmentation_list, cam_list
 
 
 def read_semantic_labels(config: omegaconf, 
                          segmentation_protos_ordered: List[open_dataset.CameraSegmentationLabel]) ->\
-                            Tuple(List[open_dataset.SemanticLabel],List[open_dataset.InstanceLabel],
-                                  List[open_dataset.PanopticLabel]):
+                            Tuple[List,List,List]:
     ''' 
     The dataset provides tracking for instances between cameras and over time.
     By setting remap_to_global=True, this function will remap the instance IDs in
@@ -178,6 +174,3 @@ def read_semantic_labels(config: omegaconf,
         instance_labels_multiframe.append(instance_labels)
 
     return semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels
-
-if __name__ == "__main__":
-    load_data('waymo_open_data_parser/config.yaml')

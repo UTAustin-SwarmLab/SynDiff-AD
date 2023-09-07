@@ -39,25 +39,35 @@ def _pad_to_common_shape(label):
 def visualize(config: omegaconf, 
               instance_labels_multiframe: List[open_dataset.CameraSegmentationLabel],
               semantic_labels_multiframe: List[open_dataset.CameraSegmentationLabel]) -> None:
-  # TODO: Add gradio visualization 
-  # Pad labels to a common size so that they can be concatenated.
+    # TODO: Add gradio visualization 
+    # Pad labels to a common size so that they can be concatenated.
+    for j,(instance_labels, semantic_labels) in enumerate(zip(instance_labels_multiframe, semantic_labels_multiframe)):
+        ilabels = [_pad_to_common_shape(label) for label in instance_labels]
+                           
+        slabels = [_pad_to_common_shape(label) for label in semantic_labels]
+                        
+        # ilabels = [np.concatenate(label, axis=0) for label in ilabels]
+        # slabels = [np.concatenate(label, axis=0) for label in slabels]
 
-  instance_labels = [[_pad_to_common_shape(label) for label in instance_labels] 
-                     for instance_labels in instance_labels_multiframe]
-  semantic_labels = [[_pad_to_common_shape(label) for label in semantic_labels]
-                      for semantic_labels in semantic_labels_multiframe]
-  instance_labels = [np.concatenate(label, axis=1) for label in instance_labels]
-  semantic_labels = [np.concatenate(label, axis=1) for label in semantic_labels]
+        instance_label_concat = np.concatenate(ilabels, axis=0)
+        semantic_label_concat = np.concatenate(slabels, axis=0)
+        panoptic_label_rgb = camera_segmentation_utils.panoptic_label_to_rgb(
+            semantic_label_concat, instance_label_concat)
+            
 
-  instance_label_concat = np.concatenate(instance_labels, axis=0)
-  semantic_label_concat = np.concatenate(semantic_labels, axis=0)
-  panoptic_label_rgb = camera_segmentation_utils.panoptic_label_to_rgb(
-      semantic_label_concat, instance_label_concat)
-      
+        plt.figure(figsize=(64, 60))
+        plt.imshow(panoptic_label_rgb)
+        plt.grid(False)
+        plt.axis('off')
+        plt.show()
+        plt.savefig(os.path.join(config.FILE_NAME,'panoptic_label_rgb{}.png'.format(j)))
 
-  plt.figure(figsize=(64, 60))
-  plt.imshow(panoptic_label_rgb)
-  plt.grid(False)
-  plt.axis('off')
-  plt.show()
-     
+if __name__ == '__main__':
+    config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
+    config.FILE_NAME = os.path.join(os.getcwd(), config.FILE_NAME)
+    context = "1005081002024129653_5313_150_5333_150"
+    frames_with_seg, _ = load_data_set_parquet(config, context)
+    semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels = read_semantic_labels(config,frames_with_seg)
+    visualize(config, instance_labels_multiframe, semantic_labels_multiframe)
+
+
