@@ -38,22 +38,26 @@ def _pad_to_common_shape(label):
 
 def visualize(config: omegaconf, 
               instance_labels_multiframe: List[open_dataset.CameraSegmentationLabel],
-              semantic_labels_multiframe: List[open_dataset.CameraSegmentationLabel]) -> None:
+              semantic_labels_multiframe: List[open_dataset.CameraSegmentationLabel],
+              camera_images: List[np.ndarray]) -> None:
     # TODO: Add gradio visualization 
     # Pad labels to a common size so that they can be concatenated.
-    for j,(instance_labels, semantic_labels) in enumerate(zip(instance_labels_multiframe, semantic_labels_multiframe)):
+    for j,(instance_labels, semantic_labels, cam_images) in enumerate(zip(instance_labels_multiframe, 
+                                                                     semantic_labels_multiframe, camera_images)):
         ilabels = [_pad_to_common_shape(label) for label in instance_labels]
-                           
         slabels = [_pad_to_common_shape(label) for label in semantic_labels]
+        cimage = [_pad_to_common_shape(image) for image in cam_images]
                         
         # ilabels = [np.concatenate(label, axis=0) for label in ilabels]
         # slabels = [np.concatenate(label, axis=0) for label in slabels]
 
-        instance_label_concat = np.concatenate(ilabels, axis=0)
-        semantic_label_concat = np.concatenate(slabels, axis=0)
+        instance_label_concat = np.concatenate(ilabels, axis=1)
+        semantic_label_concat = np.concatenate(slabels, axis=1)
+        camera_image_concat = np.concatenate(cimage, axis=1)
         panoptic_label_rgb = camera_segmentation_utils.panoptic_label_to_rgb(
             semantic_label_concat, instance_label_concat)
             
+        cam_with_panopitc = np.concatenate([camera_image_concat, panoptic_label_rgb], axis=0)
 
         plt.figure(figsize=(64, 60))
         plt.imshow(panoptic_label_rgb)
@@ -62,12 +66,18 @@ def visualize(config: omegaconf,
         plt.show()
         plt.savefig(os.path.join(config.FILE_NAME,'panoptic_label_rgb{}.png'.format(j)))
 
+        plt.figure(figsize=(64, 60))
+        plt.imshow(cam_with_panopitc)
+        plt.grid(False)
+        plt.axis('off')
+        plt.show()
+        plt.savefig(os.path.join(config.FILE_NAME,'cam_with_panoptic_rgb{}.png'.format(j)))
+
 if __name__ == '__main__':
     config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
     config.FILE_NAME = os.path.join(os.getcwd(), config.FILE_NAME)
     context = "1005081002024129653_5313_150_5333_150"
-    frames_with_seg, _ = load_data_set_parquet(config, context)
+    frames_with_seg, camera_images = load_data_set_parquet(config, context)
     semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels = read_semantic_labels(config,frames_with_seg)
-    visualize(config, instance_labels_multiframe, semantic_labels_multiframe)
-
-
+    camera_images_frame = read_camera_images(config, camera_images)
+    visualize(config, instance_labels_multiframe, semantic_labels_multiframe, camera_images_frame)

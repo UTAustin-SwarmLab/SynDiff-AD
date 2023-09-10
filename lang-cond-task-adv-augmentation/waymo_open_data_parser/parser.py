@@ -9,6 +9,8 @@ import tensorflow as tf
 import multiprocessing as mp
 import numpy as np
 import dask.dataframe as dd
+import io
+import PIL.Image as Image
 
 if not tf.executing_eagerly():
   tf.compat.v1.enable_eager_execution()
@@ -104,23 +106,26 @@ def load_data_set_parquet(config: omegaconf, context_name: str) ->\
     cam_segmentation_df = read(config, 'segmentation', context_name)
     cam_images_df = read(config, 'image', context_name)
 
+    merged_df = v2.merge(cam_images_df,cam_segmentation_df, right_group=True)
+
     # Group segmentation labels into frames by context name and timestamp.
     frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
-    cam_segmentation_per_frame_df = cam_segmentation_df.groupby(
-        frame_keys, group_keys=False).agg(list)
-
-    cam_images_per_frame_df = cam_images_df.groupby(
+    cam_segmentation_per_frame_df = merged_df.groupby(
         frame_keys, group_keys=False).agg(list)
     
     cam_segmentation_list = []
+    image_list = []
     for i, (key_values, r) in enumerate(cam_segmentation_per_frame_df.iterrows()):
         # Read three sequences of 5 camera images for this demo.
         # Store a segmentation label component for each camera.
         cam_segmentation_list.append(
             [v2.CameraSegmentationLabelComponent.from_dict(d) 
             for d in ungroup_row(frame_keys, key_values, r)])
+        image_list.append(
+            [v2.CameraImageComponent.from_dict(d) 
+            for d in ungroup_row(frame_keys, key_values, r)])
+        
 
-    cam_list = []
     #TODO: need to figure out what the function is to obtain camera images
     # for i, (key_values, r) in enumerate(cam_images_per_frame_df.iterrows()):
     #     # Read three sequences of 5 camera images for this demo.
@@ -129,7 +134,7 @@ def load_data_set_parquet(config: omegaconf, context_name: str) ->\
     #         [v2.CameraSegmentationLabelComponent.from_dict(d) 
     #         for d in ungroup_row(frame_keys, key_values, r)])
         
-    return cam_segmentation_list, cam_list
+    return cam_segmentation_list, image_list
 
 
 def read_semantic_labels(config: omegaconf, 
@@ -174,3 +179,30 @@ def read_semantic_labels(config: omegaconf,
         instance_labels_multiframe.append(instance_labels)
 
     return semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels
+
+
+def read_camera_images(config: omegaconf, 
+                        camera_images: List[open_dataset.CameraSegmentationLabel]) -> List[np.ndarray]:
+    '''
+    Read camera images from the dataset
+
+    Args:
+        config: omega config from the config.yaml file
+        camera_images: List of camera images
+    
+    Returns:
+        camera_images: List of camera images
+    '''
+
+    NUM_CAMERA_FRAMES = 5
+    camera_images_flat = sum(camera_images, [])
+    camera_images_all = []
+    for i in range(0, len(camera_images_flat), NUM_CAMERA_FRAMES):
+        camera_images_frame = []
+        for j in range(NUM_CAMERA_FRAMES):
+            camera_images_frame.append(np.array(Image.open(io.BytesIO(camera_images_flat[i + j].image))))
+        camera_images_all.append(camera_images_frame)
+    return camera_images_all
+
+
+                         
