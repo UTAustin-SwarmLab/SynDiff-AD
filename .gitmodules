@@ -1,3 +1,6 @@
 [submodule "lang-cond-task-adv-augmentation/control-net"]
 	path = lang-cond-task-adv-augmentation/control-net
 	url = https://github.com/lllyasviel/ControlNet.git
+[submodule "lang-cond-task-adv-augmentation/LLaVA"]
+	path = lang-cond-task-adv-augmentation/LLaVA
+	url = https://github.com/haotian-liu/LLaVA.git

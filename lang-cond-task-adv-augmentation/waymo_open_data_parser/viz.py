@@ -64,18 +64,22 @@ def visualize(config: omegaconf,
         plt.grid(False)
         plt.axis('off')
         plt.show()
-        plt.savefig(os.path.join(config.FILE_NAME,'panoptic_label_rgb{}.png'.format(j)))
+        plt.savefig(os.path.join(config.VIZ_DIR,'panoptic_label_rgb{}.png'.format(j)))
 
         plt.figure(figsize=(64, 60))
         plt.imshow(cam_with_panopitc)
         plt.grid(False)
         plt.axis('off')
         plt.show()
-        plt.savefig(os.path.join(config.FILE_NAME,'cam_with_panoptic_rgb{}.png'.format(j)))
+        plt.savefig(os.path.join(config.VIZ_DIR,'cam_with_panoptic_rgb{}.png'.format(j)))
 
 if __name__ == '__main__':
     config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
-    config.FILE_NAME = os.path.join(os.getcwd(), config.FILE_NAME)
+    config.TRAIN_DIR = os.path.join(os.getcwd(), config.TRAIN_DIR)
+    config.VIZ_DIR = os.path.join(os.getcwd(), config.VIZ_DIR)
+    if not os.path.exists(config.VIZ_DIR):
+        os.makedirs(config.VIZ_DIR)
+        
     context = "1005081002024129653_5313_150_5333_150"
     frames_with_seg, camera_images = load_data_set_parquet(config, context)
     semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels = read_semantic_labels(config,frames_with_seg)

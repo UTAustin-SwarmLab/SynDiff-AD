@@ -20,7 +20,7 @@ from waymo_open_dataset import v2
 
 from waymo_open_dataset.utils import camera_segmentation_utils
 
-def load_dataset_proto(config: omegaconf) -> List:
+def load_dataset_proto(config: omegaconf, validation=False) -> List:
     '''
     Load the dataset and select frames that have the segmentation labels from tf proto files
 
@@ -30,7 +30,10 @@ def load_dataset_proto(config: omegaconf) -> List:
     Returns:
         frames_with_seg: list of frames that have the segmentation labels
     '''
-    dataset = tf.data.TFRecordDataset(config.FILE_NAME, compression_type='')
+    if validation:
+        dataset = tf.data.TFRecordDataset(config.EVAL_DIR, compression_type='')
+    else:
+        dataset = tf.data.TFRecordDataset(config.TRAIN_DIR, compression_type='')
     frames_with_seg = []
     sequence_id = None
     for data in dataset:
@@ -74,11 +77,18 @@ def organise_segment_data(config: omegaconf, frames_with_seg: list) -> List:
     return segmentation_protos_ordered
 
 
-def read(config,  tag: str, context_name: str,) -> dd.DataFrame:
-  """Creates a Dask DataFrame for the component specified by its tag."""
-  
-  paths = f'{config.FILE_NAME}/{tag}/{context_name}.parquet'
-  return dd.read_parquet(paths)
+def read(config,  tag: str, context_name: str, validation=False) -> dd.DataFrame:
+    """Creates a Dask DataFrame for the component specified by its tag."""
+    if validation:
+        paths = f'{config.EVAL_DIR}/{tag}/{context_name}.parquet'
+    else:
+        paths = f'{config.TRAIN_DIR}/{tag}/{context_name}.parquet'
+    
+    try:
+        df = dd.read_parquet(paths)
+    except:
+        raise ValueError(f'Could not read {paths}')
+    return df
 
 
 def ungroup_row(key_names: Sequence[str],
@@ -90,7 +100,7 @@ def ungroup_row(key_names: Sequence[str],
     for values in zip(*cells):
         yield dict(zip(cols, values), **keys)
 
-def load_data_set_parquet(config: omegaconf, context_name: str) ->\
+def load_data_set_parquet(config: omegaconf, context_name: str, validation=False) ->\
         Tuple[List[open_dataset.CameraImage], List[open_dataset.CameraSegmentationLabel]]:
     '''
     Load datset from parquet files
@@ -103,8 +113,8 @@ def load_data_set_parquet(config: omegaconf, context_name: str) ->\
        cam_segmentation_list: List of segmentation labels ordered by the camera order
     '''
 
-    cam_segmentation_df = read(config, 'segmentation', context_name)
-    cam_images_df = read(config, 'image', context_name)
+    cam_segmentation_df = read(config, 'camera_segmentation', context_name)
+    cam_images_df = read(config, 'camera_image', context_name)
 
     merged_df = v2.merge(cam_images_df,cam_segmentation_df, right_group=True)
 
