@@ -28,13 +28,27 @@ def image_mask_pickler(config, validation=False):
     context_set = set()
     
     # read the text file 2d_pvps_training_frames.txt and extract the context names
-    with open(os.path.join(config.TRAIN_DIR, '2d_pvps_training_frames.txt'), 'r') as f:
+    if validation:
+        FOLDER = config.EVAL_DIR
+    else:
+        FOLDER = config.TRAIN_DIR
+    with open(os.path.join(FOLDER, '2d_pvps_training_frames.txt'), 'r') as f:
         for line in f:
             context_name = line.strip().split(',')[0]
             context_set.add(context_name)
     
     context_list = list(context_set)
     assert len(context_set) == 696, "The data is unbalanced, please check the data"
+
+    # Create the folders to save the data
+    if not os.path.exists(os.path.join(FOLDER, 'camera/')):
+        os.makedirs(os.path.join(FOLDER, 'camera/'))
+    
+    if not os.path.exists(os.path.join(FOLDER, 'segmentation/')):
+        os.makedirs(os.path.join(FOLDER, 'segmentation/'))
+
+    if not os.path.exists(os.path.join(FOLDER, 'instance/')):
+        os.makedirs(os.path.join(FOLDER, 'instance/'))
     
     context_pooler = Pool(processes=config.NUM_CPU)
 
@@ -43,44 +57,59 @@ def image_mask_pickler(config, validation=False):
     total_contexts = [len(context_list)]*len(context_list)
     validation = [validation]*len(context_list)
 
-    inputs = zip(configs[:32], context_list[:32], idx[:32], total_contexts[:32], validation[:32])
+    # FOR TESTING ONLY
+    # inputs = zip(configs[:config.NUM_CPU], context_list[:config.NUM_CPU],
+    #               idx[:config.NUM_CPU], total_contexts[:config.NUM_CPU], 
+    #               validation[:config.NUM_CPU])
 
-    results = context_pooler.starmap_async(load_context_list, inputs)
-    context_pooler.join()
+    inputs = zip(configs, context_list, idx, total_contexts, validation)
+
+    context_pooler.starmap(load_context_list, inputs)
     context_pooler.close()
+    context_pooler.join()
+   
     
-    camera_images_list = []
-    semantic_masks_lists = []
-    instance_masks_list = []
+    # camera_images_list = []
+    # semantic_masks_lists = []
+    # instance_masks_list = []
 
-    print('Unpacking the results')
-    for result in tqdm(results.get()):
-        if result[0] is None or result[1] is None or result[2] is None:
-            continue
-        camera_images_list += result[0]
-        semantic_masks_lists += result[1]
-        instance_masks_list += result[2]
-    print('Done unpacking the results')
+    # print('Unpacking the results')
+    # for result in tqdm(results.get()):
+    #     if result[0] is None or result[1] is None or result[2] is None:
+    #         continue
+    #     camera_images_list += result[0]
+    #     semantic_masks_lists += result[1]
+    #     instance_masks_list += result[2]
+    # print('Done unpacking the results')
         # Pickle the data
-    with open(config.data_dir + 'camera_images_list.pkl', 'wb') as f:
-        pickle.dump(camera_images_list, f)
 
-    with open(config.data_dir + 'semantic_masks_lists.pkl', 'wb') as f:
-        pickle.dump(semantic_masks_lists, f)
-    
-    with open(config.data_dir + 'instance_masks_list.pkl', 'wb') as f:
-        pickle.dump(instance_masks_list, f)
     
 
 def load_context_list(config, context_name, idx, total_contexts, validation):
     '''
     Loads the data for a single context
+
+    Args:
+        config: The config file for the project (omegaconf)
+        context_name: The name of the context to load
+        idx: The index of the context in the list of contexts
+        total_contexts: The total number of contexts
+        validation: Whether the context is for validation or not
+    
+    Returns:
+        
     '''
 
     print("Loading context: {} of {} Name: {} Validation: {}".format(idx, 
                                                                     total_contexts,
                                                                       context_name, 
                                                                       validation))
+    
+    if validation:
+        FOLDER = config.EVAL_DIR
+    else:
+        FOLDER = config.TRAIN_DIR
+
     try:
         frames_with_seg, camera_images = load_data_set_parquet(config=config, 
                                                                 context_name=context_name, 
@@ -95,13 +124,35 @@ def load_context_list(config, context_name, idx, total_contexts, validation):
         print("Failed context: {} of {} Name: {} Validation: {}".format(idx, total_contexts,
                                                                       context_name, 
                                                                       validation))
-        return None, None, None
+        return
     
     print("Finished context: {} of {} Name: {} Validation: {}".format(idx, total_contexts,
                                                                       context_name, 
                                                                       validation))
-     
-    return camera_images_frame, semantic_labels_multiframe, instance_labels_multiframe
+    # Save it in a pickle file
+    image_index = 0
+    for j, (images, semantic_masks, instance_masks) in enumerate(zip(camera_images_frame,
+                                                    semantic_labels_multiframe, 
+                                                    instance_labels_multiframe)):
+        for frame_id in config.SAVE_FRAMES:
+            with open(os.path.join(FOLDER, 'camera/camera_images{}_{}.pkl'.\
+                    format(context_name, image_index)), 'wb') as f:
+                pickle.dump(images[frame_id], f)
+
+            with open(os.path.join(FOLDER, 'segmentation/semantic_masks{}_{}.pkl'\
+                    .format(context_name, image_index)), 'wb') as f:
+                pickle.dump(semantic_masks[frame_id], f)
+            
+            with open(os.path.join(FOLDER, 'instance/instance_masks{}_{}.pkl'\
+                    .format(context_name, image_index)), 'wb') as f:
+                pickle.dump(instance_masks[frame_id], f)
+            image_index += 1
+
+    print("Finished context: {} of {} Name: {} Validation: {}".format(idx, 
+                                                                    total_contexts,
+                                                                      context_name, 
+                                                                      validation))
+    return
 
 class WaymoDataset(Dataset):
     '''
@@ -109,37 +160,46 @@ class WaymoDataset(Dataset):
     '''
     def __init__(self, config, validation=False) -> None:
         super().__init__()
+        
         if validation:
-            self.image_path = os.path.join(config.EVAL_DIR,'camera_images_list.pkl')
-            self.semantic_path = os.path.join(config.EVAL_DIR,'semantic_masks_lists.pkl')
-            self.instance_path = os.path.join(config.EVAL_DIR,'instance_masks_list.pkl')
+            self.FOLDER = config.EVAL_DIR
         else:
-            self.image_path = os.path.join(config.TRAIN_DIR,'camera_images_list.pkl')
-            self.semantic_path = os.path.join(config.TRAIN_DIR,'semantic_masks_lists.pkl')
-            self.instance_path = os.path.join(config.TRAIN_DIR,'instance_masks_list.pkl')
+            self.FOLDER = config.TRAIN_DIR
 
-        with open(self.image_path, 'rb') as f:
-            self.camera_images_list = pickle.load(f)
-        
-        with open(self.semantic_path, 'rb') as f:
-            self.semantic_masks_lists = pickle.load(f)
+        self.camera_files = os.listdir(os.path.join(self.FOLDER,'camera/'))
+        self.segment_files = os.listdir(os.path.join(self.FOLDER, 'segmentation/'))
+        self.instance_files = os.listdir(os.path.join(self.FOLDER, 'instance/'))
 
-        with (open(self.instance_path, 'rb')) as f:
-            self.instance_masks_list = pickle.load(f)
-        
+        assert len(self.camera_files) == len(self.segment_files)\
+              == len(self.instance_files), \
+            "The number of files in the camera, segmentation and instance folders \
+        are not equal"
+
+        self.num_images = len(self.camera_files)
+        # Find the number of images
 
     def __len__(self) -> int:
-        return max(len(self.camera_images_list), 
-                    len(self.semantic_mask_list), 
-                    len(self.instance_masks_list))
+        return max(len(self.camera_files), 
+                    len(self.segment_files), 
+                    len(self.instance_files))
     
 
     def __getitem__(self, index) -> Any:
         
-        camera_images = self.camera_images_list[index]
-        semantic_masks = self.semantic_masks_lists[index]
-        instance_masks = self.instance_masks_list[index]
 
+        # open the semantic label and instance label files
+        #  and return the data
+        camera_file = os.path.join(self.FOLDER, self.camera_files[index])
+        segment_file = os.path.join(self.FOLDER, self.segment_files[index])
+        instance_file = os.path.join(self.FOLDER, self.instance_files[index])
+
+        with open(camera_file, 'rb') as f:
+            camera_images = pickle.load(f)
+        with open(segment_file, 'rb') as f:
+            semantic_masks = pickle.load(f)
+        with open(instance_file, 'rb') as f:
+            instance_masks = pickle.load(f)
+        
         return camera_images, semantic_masks, instance_masks
     
 
@@ -147,13 +207,18 @@ class WaymoDataset(Dataset):
 if __name__ == '__main__':
     config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
 
-    # Append the cwd to the paths in the config file
-    for keys in config.keys():
-        if 'DIR' in keys:
-            config[keys] = os.path.join(os.getcwd(), config[keys])
+    if config.SAVE_DATA:
+        # Append the cwd to the paths in the config file
+        for keys in config.keys():
+            if 'DIR' in keys:
+                config[keys] = os.path.join(os.getcwd(), config[keys])
 
-    # Pickle the data
-    image_mask_pickler(config, validation=False)
-
-    # Create the dataloader and test the number of images
-    dataset = WaymoDataset(config)
+        # Pickle the data
+        image_mask_pickler(config, validation=False)
+    else:
+        # Create the dataloader and test the number of images
+        dataset = WaymoDataset(config)
+        dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
+        dataloader_iter = iter(dataloader)
+        data = next(dataloader_iter)
+        print(data[0].shape)
