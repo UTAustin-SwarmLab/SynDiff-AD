@@ -6,15 +6,15 @@ We will use gradio to store the resulting image and then use it to perform predi
 
 import sys
 import os
-sys.path.append(os.path.join(os.getcwd(),'control_net/'))
+sys.path.append(os.path.join(os.getcwd(),'ControlNet/'))
 
-import control_net.config
-from control_net.cldm.hack import disable_verbosity, enable_sliced_attention
+import ControlNet.config
+from ControlNet.cldm.hack import disable_verbosity, enable_sliced_attention
 
 
 disable_verbosity()
 
-if control_net.config.save_memory:
+if ControlNet.config.save_memory:
     enable_sliced_attention()
 
 
@@ -28,18 +28,30 @@ import torch
 import random
 
 from pytorch_lightning import seed_everything
-from control_net.annotator.util import resize_image, HWC3
-from control_net.annotator.uniformer import UniformerDetector
-from control_net.cldm.model import create_model, load_state_dict
-from control_net.cldm.ddim_hacked import DDIMSampler
+from ControlNet.annotator.util import resize_image, HWC3
+from ControlNet.annotator.uniformer import UniformerDetector
+from ControlNet.annotator.oneformer import OneformerCOCODetector, OneformerADE20kDetector
+from ControlNet.cldm.model import create_model, load_state_dict
+from ControlNet.cldm.ddim_hacked import DDIMSampler
 import pickle as pkl
 from ADE20K.utils import utils_ade20k
 import functools
 import matplotlib.pyplot as plt
+from typing import *
+from segment_unittest.utils import convert_pallette_segment
+from ControlNet.annotator.uniformer.mmseg.datasets import ADE20KDataset
+from copy import copy
 
-def gradio_viz(title:str, design_list=None, apply_uniformer=None, 
-                model=None, ddim_sampler=None, server_name=None, 
-                input_image=None, seg_mask = None, server_port=None):
+def gradio_viz(
+        title:str,
+        design_list:List[Dict]=None,
+        model=None, 
+        ddim_sampler=None, 
+        server_name=None, 
+        input_image=None, 
+        seg_mask = None, 
+        server_port=None,
+        prompt_tokens=None):
     '''
     Function for visualizing the segmentation maps and the resulting images.
     Args:
@@ -49,7 +61,7 @@ def gradio_viz(title:str, design_list=None, apply_uniformer=None,
     # TODO: Modularisation based on the data dictionary
     block = gr.Blocks().queue()
 
-    if apply_uniformer is None or model is None or ddim_sampler is None:
+    if model is None or ddim_sampler is None:
         raise ValueError("Please initialize the model first")
     
     with block:
@@ -66,13 +78,16 @@ def gradio_viz(title:str, design_list=None, apply_uniformer=None,
                 if seg_mask is not None:
                     seg_mask_ = gr.Image(label='Segmentation Mask', value=seg_mask[0],
                                         type='numpy')
+                
+                det = gr.Radio(choices=["Seg_OFADE20K", "Seg_OFCOCO", "Seg_UFADE20K", "None"],
+                                type="value", value="Seg_OFADE20K", label="Preprocessor")
                 prompt = gr.Textbox(label="Prompt")
                 run_button = gr.Button(label="Run")
                 with gr.Accordion("Advanced options", open=False):
                     num_samples = gr.Slider(label="Images", minimum=1,
                                              maximum=12, value=1, step=1)
                     image_resolution = gr.Slider(label="Image Resolution", 
-                                                 minimum=256, maximum=768, value=512, step=64)
+                                                 minimum=256, maximum=1024, value=512, step=64)
                     strength = gr.Slider(label="Control Strength", minimum=0.0,
                                           maximum=2.0, value=1.0, step=0.01)
                     guess_mode = gr.Checkbox(label='Guess Mode', value=False)
@@ -86,16 +101,16 @@ def gradio_viz(title:str, design_list=None, apply_uniformer=None,
                     seed = gr.Slider(label="Seed", minimum=-1, 
                                      maximum=2147483647, step=1, randomize=True)
                     eta = gr.Number(label="eta (DDIM)", value=0.0)
-                    a_prompt = gr.Textbox(label="Added Prompt", value='best quality, extremely detailed')
+                    a_prompt = gr.Textbox(label="Added Prompt", value='best quality, extremely detailed, same textures, maintain all semantics')
                     n_prompt = gr.Textbox(label="Negative Prompt",
-                                        value='longbody, lowres, bad anatomy, bad hands, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality')
+                                        value='disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality, low quality')
             with gr.Column():
                 result_gallery = gr.Gallery(label='Output', show_label=False, elem_id="gallery").style(grid=2, height='auto')
         ips = [input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, 
-               detect_resolution, ddim_steps, guess_mode, strength, scale, seed, eta]
-        run_button.click(fn=functools.partial(process, apply_uniformer=apply_uniformer,
+               detect_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, det]
+        run_button.click(fn=functools.partial(process,
                                                 model=model, ddim_sampler=ddim_sampler,
-                                                seg_mask=seg_mask),
+                                                seg_mask=seg_mask, prompt_tokens=prompt_tokens),
                             inputs=ips, outputs=[result_gallery])
                
     if server_port is None:
@@ -104,8 +119,12 @@ def gradio_viz(title:str, design_list=None, apply_uniformer=None,
         #block.launch(server_name=server_name, server_port=server_port)
         block.launch(share=True)
 
-def run_model(input_image, apply_uniformer=None, model=None, 
-              ddim_sampler=None, seg_mask=None):
+def run_model(
+        input_image,
+        model=None, 
+        ddim_sampler=None,
+        seg_mask=None
+        ):
     
     if input_image is None:
         raise ValueError("Please provide the input image")
@@ -123,11 +142,12 @@ def run_model(input_image, apply_uniformer=None, model=None,
     seed = 2000
     eta = 30.0
     guess_mode = True
+    annotator = 'Seg_OFADE20K'
 
     outputs = process(input_image, prompt, a_prompt, n_prompt,
                 num_samples, image_resolution, detect_resolution,
                 ddim_steps, guess_mode, strength, scale, seed, eta,
-                apply_uniformer=apply_uniformer, model=model, ddim_sampler=ddim_sampler,
+                det=annotator, model=model, ddim_sampler=ddim_sampler,
                   seg_mask=seg_mask)
     
     save_path = os.path.join(os.getcwd(), config.SAVE.PATH)
@@ -145,29 +165,49 @@ def run_model(input_image, apply_uniformer=None, model=None,
 
 
 def initialize_model(config):
-    apply_uniformer = UniformerDetector()
     config.control_net.MODEL_PATH = os.path.join(os.getcwd(),
                                                  config.control_net.MODEL_PATH)
     config.control_net.CONFIG_PATH = os.path.join(os.getcwd(), 
                                                   config.control_net.CONFIG_PATH)
+    config.control_net.SD_CHECKPOINT = os.path.join(os.getcwd(),
+                                                     config.control_net.SD_CHECKPOINT)
     model = create_model(config.control_net.CONFIG_PATH).cpu()
-    model.load_state_dict(load_state_dict(config.control_net.MODEL_PATH, location='cuda'))
+    model.load_state_dict(load_state_dict(config.control_net.SD_CHECKPOINT, 
+                                          location='cuda'), 
+                                          strict=False)
+    model.load_state_dict(load_state_dict(config.control_net.MODEL_PATH,
+                                           location='cuda'),
+                                           strict=False)
     model = model.cuda()
     ddim_sampler = DDIMSampler(model)
 
-    return apply_uniformer, model, ddim_sampler
+    return model, ddim_sampler
 
 def process(input_image, prompt, a_prompt, n_prompt,
              num_samples, image_resolution, detect_resolution, 
-             ddim_steps, guess_mode, strength, scale, seed, eta,
-             apply_uniformer=None, model=None, ddim_sampler=None, seg_mask=None):
+             ddim_steps, guess_mode, strength, scale, seed, eta, det,
+             apply_uniformer=None, model=None, ddim_sampler=None, seg_mask=None,
+             prompt_tokens=None):
+    '''
+    prompt_tokens : Dict of additional prompt tokens
+    '''
+
+    if det == 'Seg_OFCOCO':
+        preprocessor = OneformerCOCODetector()
+    if det == 'Seg_OFADE20K':
+        preprocessor = OneformerADE20kDetector()
+    if det == 'Seg_UFADE20K':
+        preprocessor = UniformerDetector()
+                          
     with torch.no_grad():
         input_image = HWC3(input_image)
-        if seg_mask is None:
-            detected_map = apply_uniformer(resize_image(input_image, detect_resolution))
+        if seg_mask is None and det is None:
+            detected_map = input_image.copy()
+        elif seg_mask is None:
+            detected_map = preprocessor(resize_image(input_image, detect_resolution))
             uniformer_segmap = detected_map.copy()
         else:
-            uniformer_segmap = apply_uniformer(resize_image(input_image, detect_resolution))
+            uniformer_segmap = preprocessor(resize_image(input_image, detect_resolution))
             detected_map = seg_mask[0].copy()
 
         img = resize_image(input_image, image_resolution)
@@ -185,9 +225,14 @@ def process(input_image, prompt, a_prompt, n_prompt,
             seed = random.randint(0, 65535)
         seed_everything(seed)
 
-        if control_net.config.save_memory:
+        if ControlNet.config.save_memory:
             model.low_vram_shift(is_diffusing=False)
 
+        # Add more prompt keywords based on the semantics present
+        if prompt_tokens['a_prompt'] is not None:
+            a_prompt += ("," + prompt_tokens['a_prompt'])
+        if prompt_tokens['n_prompt'] is not None:
+            n_prompt += ("," + prompt_tokens['n_prompt'])
 
         cond = {"c_concat": [control], "c_crossattn": 
                 [model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
@@ -195,7 +240,7 @@ def process(input_image, prompt, a_prompt, n_prompt,
                     "c_crossattn": [model.get_learned_conditioning([n_prompt] * num_samples)]}
         shape = (4, H // 8, W // 8)
 
-        if control_net.config.save_memory:
+        if ControlNet.config.save_memory:
             model.low_vram_shift(is_diffusing=False)
 
         model.control_scales = [strength * (0.825 ** float(12 - i)) \
@@ -205,7 +250,7 @@ def process(input_image, prompt, a_prompt, n_prompt,
                                                      unconditional_guidance_scale=scale,
                                                      unconditional_conditioning=un_cond)
 
-        if control_net.config.save_memory:
+        if ControlNet.config.save_memory:
             model.low_vram_shift(is_diffusing=False)
 
         x_samples = model.decode_first_stage(samples)
@@ -213,7 +258,10 @@ def process(input_image, prompt, a_prompt, n_prompt,
             .cpu().numpy().clip(0, 255).astype(np.uint8)
 
         results = [x_samples[i] for i in range(num_samples)]
-    return [uniformer_segmap] + [detected_map] + results
+        seg_results = []
+        for result in results:
+            seg_results.append(preprocessor(resize_image(result, detect_resolution)))
+    return [uniformer_segmap] + [detected_map] + results + seg_results
 
 def get_ade20k(config):
     index_file = 'index_ade20k.pkl'
@@ -240,24 +288,52 @@ def get_ade20k(config):
     info = utils_ade20k.loadAde20K('{}/{}'.format(config.image.DATASET_PATH, full_file_name))
     img = cv2.imread(info['img_name'])[:,:,::-1]
     seg = cv2.imread(info['segm_name'])[:,:,::-1]
+    object_mask = info['class_mask']
     seg_mask = seg.copy()
+    
+    # Map the object instance mask to that compatible with the color pallette
+    dataset_metadata = ADE20KDataset()
+    metadata = {}
+    metadata['object_classes'] = dataset_metadata.CLASSES
+    metadata['pallete'] = dataset_metadata.PALETTE
+    extra_mapping = dict()
+    extra_mapping['central reservation'] = 'sidewalk'
 
-    return img, seg_mask
+    # Somehow the indexes are shifted by 1: correcting this
+    object_mask -=1 
+    object_mask[object_mask == -1] = 0
 
+    seg_mask_metadata = {}
+    seg_mask_metadata['object_classes'] = copy(index_ade20k['objectnames'])
+    seg_mask, object_keys = convert_pallette_segment(metadata=metadata,
+                                        obj_mask=object_mask.copy(),
+                                        seg_mask_metadata=seg_mask_metadata,
+                                        extra_mapping=extra_mapping)
+    
+    return img, seg_mask, object_keys
 
 def get_waymo_data(config):
     raise NotImplementedError
+
 if __name__ == "__main__":
     config = omegaconf.OmegaConf.load('segment_unittest/config.yaml')
-    apply_uniformer, model, ddim_sampler = initialize_model(config)
-    img, seg_mask = get_ade20k(config)
+    model, ddim_sampler = initialize_model(config)
+    img, seg_mask, object_keys = get_ade20k(config)
+
+    prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
+    for key in object_keys:
+        if key != '-':
+            prompt_tokens['a_prompt'] += 'same {}, '.format(key)
+            prompt_tokens['n_prompt'] += 'missing {}, '.format(key)
+
     if config.GRADIO:
-        gradio_viz(title='contorl net test', apply_uniformer=apply_uniformer, 
+        gradio_viz(title='contorl net test', 
                 model=model, ddim_sampler=ddim_sampler,
-                input_image=img.copy(), seg_mask = None, 
-                server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090)
+                input_image=img.copy(), seg_mask = [seg_mask.copy()], 
+                server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090,
+                prompt_tokens=prompt_tokens)
     else:
-        run_model(img.copy(), apply_uniformer=apply_uniformer, 
+        run_model(img.copy(), 
                 model=model, ddim_sampler=ddim_sampler, seg_mask=[seg_mask.copy()])
 # TODO: Modularization of this function is pending
 # DESIGN_DICT =  [{'type': 'image', 
