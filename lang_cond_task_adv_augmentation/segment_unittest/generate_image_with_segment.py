@@ -91,6 +91,7 @@ def gradio_viz(
                     strength = gr.Slider(label="Control Strength", minimum=0.0,
                                           maximum=2.0, value=1.0, step=0.01)
                     guess_mode = gr.Checkbox(label='Guess Mode', value=False)
+                    apply_image_cond = gr.Checkbox(label='Apply Image Condition', value=False)
                     detect_resolution = gr.Slider(label="Segmentation Resolution", 
                                                   minimum=128, maximum=2048, 
                                                   value=512, step=1)
@@ -107,7 +108,8 @@ def gradio_viz(
             with gr.Column():
                 result_gallery = gr.Gallery(label='Output', show_label=False, elem_id="gallery").style(grid=2, height='auto')
         ips = [input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, 
-               detect_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, det]
+               detect_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, det,
+               apply_image_cond]
         run_button.click(fn=functools.partial(process,
                                                 model=model, ddim_sampler=ddim_sampler,
                                                 seg_mask=seg_mask, prompt_tokens=prompt_tokens),
@@ -185,7 +187,7 @@ def initialize_model(config):
 
 def process(input_image, prompt, a_prompt, n_prompt,
              num_samples, image_resolution, detect_resolution, 
-             ddim_steps, guess_mode, strength, scale, seed, eta, det,
+             ddim_steps, guess_mode, strength, scale, seed, eta, det, apply_image_cond,
              apply_uniformer=None, model=None, ddim_sampler=None, seg_mask=None,
              prompt_tokens=None):
     '''
@@ -313,7 +315,53 @@ def get_ade20k(config):
     return img, seg_mask, object_keys
 
 def get_waymo_data(config):
-    raise NotImplementedError
+    index_file = 'index_ade20k.pkl'
+    dataset_path = os.path.join(os.getcwd(), config.image.DATASET_PATH)
+    with open('{}/{}'.format(dataset_path, index_file), 'rb') as f:
+        index_ade20k = pkl.load(f)
+    
+    file_name = index_ade20k['filename'][config.image.image_id]
+    num_obj = index_ade20k['objectPresence'][:, config.image.image_id].sum()
+    num_parts = index_ade20k['objectIsPart'][:, config.image.image_id].sum()
+    count_obj = index_ade20k['objectPresence'][:, config.image.image_id].max()
+    obj_id = np.where(index_ade20k['objectPresence'][:, config.image.image_id]\
+                       == count_obj)[0][0]
+    obj_name = index_ade20k['objectnames'][obj_id]
+    full_file_name = '{}/{}'.format(index_ade20k['folder'][config.image.image_id],
+                                     index_ade20k['filename'][config.image.image_id])
+
+    print("The image at index {} is {}".format(config.image.image_id, file_name))
+    print("It is located at {}".format(full_file_name))
+    print("It happens in a {}".format(index_ade20k['scene'][config.image.image_id]))
+    print("It has {} objects, of which {} are parts".format(num_obj, num_parts))
+    print("The most common object is object {} ({}), which appears {} times".format(obj_name, obj_id, count_obj))
+
+    info = utils_ade20k.loadAde20K('{}/{}'.format(config.image.DATASET_PATH, full_file_name))
+    img = cv2.imread(info['img_name'])[:,:,::-1]
+    seg = cv2.imread(info['segm_name'])[:,:,::-1]
+    object_mask = info['class_mask']
+    seg_mask = seg.copy()
+    
+    # Map the object instance mask to that compatible with the color pallette
+    dataset_metadata = ADE20KDataset()
+    metadata = {}
+    metadata['object_classes'] = dataset_metadata.CLASSES
+    metadata['pallete'] = dataset_metadata.PALETTE
+    extra_mapping = dict()
+    extra_mapping['central reservation'] = 'sidewalk'
+
+    # Somehow the indexes are shifted by 1: correcting this
+    object_mask -=1 
+    object_mask[object_mask == -1] = 0
+
+    seg_mask_metadata = {}
+    seg_mask_metadata['object_classes'] = copy(index_ade20k['objectnames'])
+    seg_mask, object_keys = convert_pallette_segment(metadata=metadata,
+                                        obj_mask=object_mask.copy(),
+                                        seg_mask_metadata=seg_mask_metadata,
+                                        extra_mapping=extra_mapping)
+    
+    return img, seg_mask, object_keys
 
 if __name__ == "__main__":
     config = omegaconf.OmegaConf.load('segment_unittest/config.yaml')
