@@ -192,7 +192,7 @@ class WaymoDataset(Dataset):
                 context_frame = int(line.strip().split(',')[1])
                 self.context_set.add(context_name)
                 if self.segment_frames.get(context_name) is None:
-                    self.segment_frames[context_name] = [context_name]
+                    self.segment_frames[context_name] = [context_frame]
                 else:
                     self.segment_frames[context_name].append(context_frame)
                 self.num_images += 1
@@ -250,7 +250,6 @@ class WaymoDataset(Dataset):
         #             len(self.instance_files))
         return self.num_images
 
-    @staticmethod
     def get_text_description(self, object_mask: np.ndarray) -> str:
         '''
         Returns the text description of the object mask
@@ -281,8 +280,22 @@ class WaymoDataset(Dataset):
         semantic_mask = self.color_map[object_mask.squeeze()]
         return semantic_mask
 
-    def __getitem__(self, index) -> Any:
-        
+    def __getitem__(
+            self, 
+            index:int
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict]:
+        '''
+        Returns an item from the dataset referenced by index
+
+        Args:
+            index: The index of the item to return
+        Returns:
+            camera_images: The camera images
+            semantic_mask_rgb: The semantic mask in rgb format
+            instance_masks: The instance masks
+            object_masks: The object masks
+            img_data (dict): The image data
+        '''
 
         # open the semantic label and instance label files
         #  and return the dataset
@@ -343,7 +356,13 @@ class WaymoDataset(Dataset):
         semantic_mask_rgb = self.get_semantic_mask(object_masks)
         panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
                                                                              instance_masks)
-        return camera_images, semantic_mask_rgb, instance_masks, object_masks
+        
+        img_data = {
+            'context_name': context_name,
+            'context_frame': context_frame,
+            'camera_id': camera_id
+        }
+        return camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data
     
 
 
@@ -361,7 +380,12 @@ if __name__ == '__main__':
     else:
         # Create the dataloader and test the number of images
         dataset = WaymoDataset(config)
-        dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
-        dataloader_iter = iter(dataloader)
-        data = next(dataloader_iter)
-        print(data[0].shape)
+
+        # try except
+        try:
+            dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
+            dataloader_iter = iter(dataloader)
+            data = next(dataloader_iter)
+            print(data[0].shape)
+        except:
+            raise ValueError("The dataloader failed to load,try creating a custom dataloader with your own collate_fn ")
