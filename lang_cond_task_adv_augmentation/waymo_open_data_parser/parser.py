@@ -100,10 +100,13 @@ def ungroup_row(key_names: Sequence[str],
     for values in zip(*cells):
         yield dict(zip(cols, values), **keys)
 
-def load_data_set_parquet(config: omegaconf, context_name: str, validation=False) ->\
+def load_data_set_parquet(config: omegaconf, 
+                        context_name: str,
+                        validation=False,
+                        context_frames:List = None) ->\
         Tuple[List[open_dataset.CameraImage], List[open_dataset.CameraSegmentationLabel]]:
     '''
-    Load datset from parquet files
+    Load datset from parquet files for segmentation and camera images
     
     Args:
         config: OmegaConf DictConfig object with the data directory and file name (see config,yaml)
@@ -120,9 +123,24 @@ def load_data_set_parquet(config: omegaconf, context_name: str, validation=False
 
     # Group segmentation labels into frames by context name and timestamp.
     frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
-    cam_segmentation_per_frame_df = merged_df.groupby(
-        frame_keys, group_keys=False).agg(list)
-    
+
+    if context_frames is None:
+        #frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
+        cam_segmentation_per_frame_df = merged_df.groupby(
+            frame_keys, group_keys=False).agg(list)
+    else:
+        
+        #frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
+        # cam_segmentation_per_frame_df = merged_df.groupby(
+        #     frame_keys, group_keys=True).agg(list)
+        
+        # filter out the frames that are not in the context_frames
+        cam_segmentation_per_frame_df = merged_df.reset_index()
+        cam_segmentation_per_frame_df = cam_segmentation_per_frame_df.set_index('key.frame_timestamp_micros')
+        cam_segmentation_per_frame_df = cam_segmentation_per_frame_df.loc[context_frames]
+        cam_segmentation_per_frame_df = cam_segmentation_per_frame_df.groupby(
+            frame_keys, group_keys=False).agg(list)
+        
     cam_segmentation_list = []
     image_list = []
     for i, (key_values, r) in enumerate(cam_segmentation_per_frame_df.iterrows()):
@@ -134,9 +152,8 @@ def load_data_set_parquet(config: omegaconf, context_name: str, validation=False
         image_list.append(
             [v2.CameraImageComponent.from_dict(d) 
             for d in ungroup_row(frame_keys, key_values, r)])
-        
 
-    #TODO: need to figure out what the function is to obtain camera images
+    # TODO: need to figure out what the function is to obtain camera images
     # for i, (key_values, r) in enumerate(cam_images_per_frame_df.iterrows()):
     #     # Read three sequences of 5 camera images for this demo.
     #     # Store a segmentation label component for each camera.
@@ -214,5 +231,3 @@ def read_camera_images(config: omegaconf,
         camera_images_all.append(camera_images_frame)
     return camera_images_all
 
-
-                         

@@ -1,7 +1,7 @@
 
-from waymo_open_dataset.protos import camera_segmentation_metrics_pb2 as metrics_pb2
-from waymo_open_dataset.protos import camera_segmentation_submission_pb2 as submission_pb2
-from waymo_open_dataset.wdl_limited.camera_segmentation import camera_segmentation_metrics
+# from waymo_open_dataset.protos import camera_segmentation_metrics_pb2 as metrics_pb2
+# from waymo_open_dataset.protos import camera_segmentation_submission_pb2 as submission_pb2
+# from waymo_open_dataset.wdl_limited.camera_segmentation import camera_segmentation_metrics
 from waymo_open_dataset.utils import camera_segmentation_utils
 
 from waymo_open_data_parser.parser import *
@@ -81,7 +81,13 @@ if __name__ == '__main__':
         os.makedirs(config.VIZ_DIR)
         
     context = "1005081002024129653_5313_150_5333_150"
-    frames_with_seg, camera_images = load_data_set_parquet(config, context)
+    context_frame = [1510593618340205, 1510593607540181] # None
+
+    
+    frames_with_seg, camera_images = load_data_set_parquet(config, context, 
+                                                           context_frames=context_frame)
     semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels = read_semantic_labels(config,frames_with_seg)
     camera_images_frame = read_camera_images(config, camera_images)
+
+
     visualize(config, instance_labels_multiframe, semantic_labels_multiframe, camera_images_frame)
