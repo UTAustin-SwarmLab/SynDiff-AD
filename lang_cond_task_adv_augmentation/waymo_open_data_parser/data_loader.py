@@ -13,6 +13,7 @@ from multiprocess import Pool
 from typing import *
 import numpy as np
 import os
+from waymo_open_dataset.utils import camera_segmentation_utils
 
 def image_mask_pickler(config, validation=False):
     '''
@@ -181,17 +182,17 @@ class WaymoDataset(Dataset):
             self.FOLDER = config.TRAIN_DIR
 
         self.context_set = set()
-        self.segment_frames = list()
+        self.segment_frames = dict()
         self.num_images = 0
         self.ds_config = config
         self.validation = validation
         with open(os.path.join(self.FOLDER, '2d_pvps_training_frames.txt'), 'r') as f:
             for line in f:
                 context_name = line.strip().split(',')[0]
-                context_frame = line.strip().split(',')[1]
+                context_frame = int(line.strip().split(',')[1])
                 self.context_set.add(context_name)
                 if self.segment_frames.get(context_name) is None:
-                    self.segment_frames[context_name] = []
+                    self.segment_frames[context_name] = [context_name]
                 else:
                     self.segment_frames[context_name].append(context_frame)
                 self.num_images += 1
@@ -208,6 +209,7 @@ class WaymoDataset(Dataset):
         # RGB colors used to visualize each semantic segmentation class.
         
         self.CLASSES_TO_PALLETTE = {
+            'undefined' : [0, 0, 0],
             'ego_vehicle': [102, 102, 102],
             'car': [0, 0, 142], 
             'truck': [0, 0, 70], 
@@ -240,28 +242,13 @@ class WaymoDataset(Dataset):
 
         self.CLASSES = list(self.CLASSES_TO_PALLETTE.keys())
         self.PALLETE = list(self.CLASSES_TO_PALLETTE.values())
-        self.inv_CLASSES_TO_PALLETE = {tuple(v): k for k, v in self.CLASSES_TO_PALLETTE.items()}
+        self.color_map = np.array(self.PALLETE).astype(np.uint8)
 
     def __len__(self) -> int:
         # return max(len(self.camera_files), 
         #             len(self.segment_files), 
         #             len(self.instance_files))
         return self.num_images
-    
-
-    def get_object_class(self, semantic_mask: np.ndarray) -> List[int]:
-        '''
-        Returns the object classes in the semantic mask
-
-        Args:
-            semantic_mask: The semantic mask to extract the object classes from
-        
-        Returns:
-            object_classes: The object classes in the semantic mask
-        '''
-        
-        mapped_object_mask = np.vectorize(lambda x: tuple(self.inv_CLASSES_TO_PALLETE.get(x)))(semantic_mask)
-        return mapped_object_mask
 
     @staticmethod
     def get_text_description(self, object_mask: np.ndarray) -> str:
@@ -280,12 +267,25 @@ class WaymoDataset(Dataset):
         for object in object_set:
             text_description += self.CLASSES[object] + ', '
         return text_description[:-1]
+    
+    def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
+        '''
+        Returns the semantic mask from the object mask
+
+        Args:
+            object_mask: The object mask to extract the semantic mask from
+        
+        Returns:
+            semantic_mask: The semantic mask of the object mask
+        '''
+        semantic_mask = self.color_map[object_mask.squeeze()]
+        return semantic_mask
 
     def __getitem__(self, index) -> Any:
         
 
         # open the semantic label and instance label files
-        #  and return the data
+        #  and return the dataset
         # camera_file = os.path.join(self.FOLDER, self.camera_files[index])
         # segment_file = os.path.join(self.FOLDER, self.segment_files[index])
         # instance_file = os.path.join(self.FOLDER, self.instance_files[index])
@@ -304,14 +304,17 @@ class WaymoDataset(Dataset):
 
         # Find the appropriate index at which the image is stored
         index_copy = index
-
-        context_name = k
+        cum_sum = 0
         for k in self.segment_frames.keys():
-            self.cum_sum += len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
-            if self.cum_sum>=index:
+            cum_sum += len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
+            if cum_sum>=index:
                 context_name = k
-                context_frame = self.segment_frames[k][int((index - self.cum_sum)/3)]
-                camera_id = self.ds_config.SAVE_FRAMES[(index - self.cum_sum)%3]
+                len_context = len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
+                context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
+                                                           /len(self.ds_config.SAVE_FRAMES))]
+                camera_id = self.ds_config.SAVE_FRAMES[(index - cum_sum + len_context\
+                                                        )%len(self.ds_config.SAVE_FRAMES)]
+                break
         # Load all the frames from the context file
         frames_with_seg, camera_images = load_data_set_parquet(
             config=self.ds_config, 
@@ -332,11 +335,15 @@ class WaymoDataset(Dataset):
             camera_images
         )
 
-        camera_images = camera_images_frame[camera_id]
-        semantic_masks = semantic_labels_multiframe[camera_id]
-        instance_masks = instance_labels_multiframe[camera_id]
-        object_masks = self.get_object_class(semantic_masks)
-        return camera_images, semantic_masks, instance_masks, object_masks
+        # All semantic labels are in the form of object indices defined by the PALLETE
+        camera_images = camera_images_frame[0][camera_id]
+        object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
+        instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
+
+        semantic_mask_rgb = self.get_semantic_mask(object_masks)
+        panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
+                                                                             instance_masks)
+        return camera_images, semantic_mask_rgb, instance_masks, object_masks
     
 
 
