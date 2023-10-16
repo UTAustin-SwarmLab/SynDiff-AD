@@ -100,11 +100,12 @@ def ungroup_row(key_names: Sequence[str],
     for values in zip(*cells):
         yield dict(zip(cols, values), **keys)
 
-def load_data_set_parquet(config: omegaconf, 
-                        context_name: str,
-                        validation=False,
-                        context_frames:List = None) ->\
-        Tuple[List[open_dataset.CameraImage], List[open_dataset.CameraSegmentationLabel]]:
+def load_data_set_parquet(
+        config: omegaconf, 
+        context_name: str,
+        validation=False,
+        context_frames:List = None,
+        segmentation = True) -> Tuple[List[v2.CameraImageComponent], List[Any]]:
     '''
     Load datset from parquet files for segmentation and camera images
     
@@ -116,17 +117,22 @@ def load_data_set_parquet(config: omegaconf,
        cam_segmentation_list: List of segmentation labels ordered by the camera order
     '''
 
-    cam_segmentation_df = read(config, 'camera_segmentation', context_name)
+    
     cam_images_df = read(config, 'camera_image', context_name)
 
-    merged_df = v2.merge(cam_images_df,cam_segmentation_df, right_group=True)
+    if segmentation:
+        cam_segmentation_df = read(config, 'camera_segmentation', context_name)
+        merged_df = v2.merge(cam_images_df,cam_segmentation_df, right_group=True)
+    else:
+        cam_boxes_df = read(config, 'camera_box', context_name)
+        merged_df = v2.merge(cam_images_df,cam_boxes_df, right_group=True)
 
     # Group segmentation labels into frames by context name and timestamp.
     frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
 
     if context_frames is None:
         #frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
-        cam_segmentation_per_frame_df = merged_df.groupby(
+        cam_labels_per_frame_df = merged_df.groupby(
             frame_keys, group_keys=False).agg(list)
     else:
         
@@ -135,19 +141,24 @@ def load_data_set_parquet(config: omegaconf,
         #     frame_keys, group_keys=True).agg(list)
         
         # filter out the frames that are not in the context_frames
-        cam_segmentation_per_frame_df = merged_df.reset_index()
-        cam_segmentation_per_frame_df = cam_segmentation_per_frame_df.set_index('key.frame_timestamp_micros')
-        cam_segmentation_per_frame_df = cam_segmentation_per_frame_df.loc[context_frames]
-        cam_segmentation_per_frame_df = cam_segmentation_per_frame_df.groupby(
+        # cam_labels_per_frame_df = merged_df.reset_index()
+        cam_labels_per_frame_df = merged_df.set_index('key.frame_timestamp_micros')
+        cam_labels_per_frame_df = cam_labels_per_frame_df.loc[context_frames]
+        cam_labels_per_frame_df = cam_labels_per_frame_df.groupby(
             frame_keys, group_keys=False).agg(list)
         
-    cam_segmentation_list = []
+    cam_labels_list = []
     image_list = []
-    for i, (key_values, r) in enumerate(cam_segmentation_per_frame_df.iterrows()):
+    for i, (key_values, r) in enumerate(cam_labels_per_frame_df.iterrows()):
         # Read three sequences of 5 camera images for this demo.
         # Store a segmentation label component for each camera.
-        cam_segmentation_list.append(
-            [v2.CameraSegmentationLabelComponent.from_dict(d) 
+        if segmentation:
+            cam_labels_list.append(
+                [v2.CameraSegmentationLabelComponent.from_dict(d) 
+                for d in ungroup_row(frame_keys, key_values, r)])
+        else:
+            cam_labels_list.append(
+            [v2.CameraBoxComponent.from_dict(d) 
             for d in ungroup_row(frame_keys, key_values, r)])
         image_list.append(
             [v2.CameraImageComponent.from_dict(d) 
@@ -161,12 +172,13 @@ def load_data_set_parquet(config: omegaconf,
     #         [v2.CameraSegmentationLabelComponent.from_dict(d) 
     #         for d in ungroup_row(frame_keys, key_values, r)])
         
-    return cam_segmentation_list, image_list
+    return cam_labels_list, image_list
 
 
-def read_semantic_labels(config: omegaconf, 
-                         segmentation_protos_ordered: List[open_dataset.CameraSegmentationLabel]) ->\
-                            Tuple[List,List,List]:
+def read_semantic_labels(
+        config: omegaconf, 
+        segmentation_protos_ordered: List[v2.CameraSegmentationLabelComponent]
+        ) -> Tuple[List,List,List]:
     ''' 
     The dataset provides tracking for instances between cameras and over time.
     By setting remap_to_global=True, this function will remap the instance IDs in
@@ -207,9 +219,57 @@ def read_semantic_labels(config: omegaconf,
 
     return semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels
 
+def read_box_labels(
+        config: omegaconf, 
+        box_labels: List[v2.CameraBoxComponent]
+        ) -> Tuple[List,List,List]:
+    ''' 
+    The dataset provides tracking for instances between cameras and over time.
+    By setting remap_to_global=True, this function will remap the instance IDs in
+     each image so that instances for the same object will have the same ID between
+     different cameras and over time.
+
+    Args:
+        config: omega congif gfrom the config.yaml file
+        segmentation_protos_ordered: List of segmentation labels ordered by the camera order
+    
+    Returns:
+        box_class: List of object types (classes)
+        bounding_boxes: List of bounding boxes
+    '''
+    # We can further separate the semantic and instance labels from the panoptic
+    # labels.
+    NUM_CAMERA_FRAMES = 5
+    box_classes_frame = [] # For the entire frame per camera
+    bounding_boxes_frame = [] # For the entire frame per camera
+    try:
+        for j in range(NUM_CAMERA_FRAMES):
+            box_classes = []
+            bounding_boxes = []
+            for i in range(0, len(box_labels),1):
+                box_classes.append(box_labels[i][j].type)
+                bounding_boxes.append(
+                np.array([
+                    box_labels[i][j].box.center.x,
+                    box_labels[i][j].box.center.y,
+                    box_labels[i][j].box.size.x,
+                    box_labels[i][j].box.size.y
+                ]))
+                    
+            
+            box_classes_frame.append(box_classes)
+            bounding_boxes_frame.append(bounding_boxes)
+    except:
+        print('Box labels not found')
+        box_classes_frame = None
+        bounding_boxes_frame = None
+        
+    return box_classes_frame, bounding_boxes_frame
+
 
 def read_camera_images(config: omegaconf, 
-                        camera_images: List[open_dataset.CameraSegmentationLabel]) -> List[np.ndarray]:
+                        camera_images: List[v2.CameraImageComponent]
+                        ) -> List[np.ndarray]:
     '''
     Read camera images from the dataset
 
