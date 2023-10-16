@@ -19,11 +19,30 @@ from io import BytesIO
 from segment_unittest.utils import convert_pallette_segment
 import omegaconf
 from waymo_open_data_parser.data_loader import WaymoDataset
+import pandas as pd
+from tqdm import tqdm
+import numpy as np
 
-def load_image(dataset: WaymoDataset, index):
-    image, _, _, object_mask = dataset[index]
-    prompt_tokens = dataset.get_text_description(object_mask)
-    return image, prompt_tokens
+def load_image(dataset: WaymoDataset, 
+               index,
+               batch_size: int = 1):
+    if batch_size == 1:
+        image, _, _, object_mask, image_data = dataset[index]
+        prompt_tokens = dataset.get_text_description(object_mask)
+        return image, prompt_tokens, image_data
+    else:
+        images = []
+        prompt_tokens_list = []
+        image_data_list = []
+        for j in range(batch_size):
+            image, _, _, object_mask, image_data = dataset[index*batch_size + j]
+            images.append(image)
+            prompt_tokens = dataset.get_text_description(object_mask)
+            prompt_tokens_list.append(prompt_tokens)
+            image_data_list.append(image_data)
+        image = np.stack(images)
+
+        return images, prompt_tokens_list, image_data_list
 
 def get_caption(model: torch.nn.Module,
                 model_name: str,
@@ -35,7 +54,9 @@ def get_caption(model: torch.nn.Module,
                 query: str,
                 conv_mode: str):
 
-    image, prompt_objects = load_image(dataset, index)
+    image, prompt_objects, image_data = load_image(
+        dataset,
+        index)
     qs = query.format(prompt_objects)
 
     if model.config.mm_use_im_start_end:
@@ -44,10 +65,12 @@ def get_caption(model: torch.nn.Module,
         qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
     
     
+
     conv = conv_templates[conv_mode].copy()
     conv.append_message(conv.roles[0], qs)
     conv.append_message(conv.roles[1], None)
     prompt = conv.get_prompt()
+    
 
     image_tensor = image_processor.preprocess(image, 
                                               return_tensors='pt')['pixel_values']\
@@ -82,7 +105,7 @@ def get_caption(model: torch.nn.Module,
         outputs = outputs[:-len(stop_str)]
     outputs = outputs.strip()
     
-    return outputs
+    return outputs, image_data
 
 
 def caption_dataset(config):
@@ -115,10 +138,17 @@ def caption_dataset(config):
     else:
         config.LLAVACAPTION.conv_mode = conv_mode
 
-    dataset = WaymoDataset(config.image)
+    dataset = WaymoDataset(config.image, image_meta_data=True)
     captions = []
-    for j in range(config.LLAVACAPTION.NUM_IMAGES):
-        caption = get_caption(model, 
+    column_names = []
+
+    if config.LLAVACAPTION.NUM_IMAGES == 'ALL':
+        config.LLAVACAPTION.NUM_IMAGES = len(dataset)
+    elif type(config.LLAVACAPTION.NUM_IMAGES) == str:
+        raise ValueError('NUM_IMAGES must be an integer or "ALL"')
+
+    for j in tqdm(range(config.LLAVACAPTION.NUM_IMAGES)):
+        caption, image_data = get_caption(model, 
                               model_name, 
                               image_processor, 
                               tokenizer, 
@@ -127,17 +157,21 @@ def caption_dataset(config):
                               j, 
                               config.LLAVACAPTION.prompt, 
                               config.LLAVACAPTION.conv_mode)
-        print(caption)
-        captions.append(caption)
-    
-    return captions
+        keys = list(image_data.keys())
+        values = list(image_data.values())
+        column_names.append(tuple(keys + ['caption']))
+        captions.append([tuple(values + [caption])])
+    column_names = set(column_names)
+    captions_df = pd.DataFrame(captions, columns=list(column_names))
+    return captions_df
 
 if __name__ == "__main__":
     config = omegaconf.OmegaConf.load("segment_unittest/config.yaml")
     captions = caption_dataset(config)
 
-    # Store the captions somewhere
-    with open("captions.txt", "w") as f:
-        for caption in captions:
-            f.write(caption)
-            f.write("\n")
+    # Create a parquet file that stores captions of all the images in the dataset
+    prompt_folder = "../waymo_data/training/"
+
+    # save captions 
+    print('Writing Captions')
+    captions.to_csv(os.path.join(prompt_folder,'waymo_captions.csv'), index=False)
