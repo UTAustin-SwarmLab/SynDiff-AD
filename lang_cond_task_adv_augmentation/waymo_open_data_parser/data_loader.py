@@ -14,6 +14,8 @@ from typing import *
 import numpy as np
 import os
 from waymo_open_dataset.utils import camera_segmentation_utils
+import torch 
+import functools
 
 def image_mask_pickler(config, validation=False):
     '''
@@ -172,21 +174,39 @@ class WaymoDataset(Dataset):
     segment_frames: Dict[str, List[str]]
     ds_length: int
     ds_config: omegaconf
+    segmentation: bool
+    image_meta_data: bool # Whether to return the image meta data or not when accessing items
 
-    def __init__(self, config, validation=False) -> None:
+    def __init__(self, config, 
+                 validation=False, 
+                 segmentation=True,
+                 image_meta_data=False) -> None:
         super().__init__()
 
-        if validation:
-            self.FOLDER = config.EVAL_DIR
+        if segmentation:
+            if validation:
+                self.FOLDER = config.EVAL_DIR
+                self.contexts_path = os.path.join(self.FOLDER, '2d_pvps_validation_frames.txt')
+            else:
+                self.FOLDER = config.TRAIN_DIR
+                self.contexts_path = os.path.join(self.FOLDER, '2d_pvps_training_frames.txt')
         else:
-            self.FOLDER = config.TRAIN_DIR
+            if validation:
+                self.FOLDER = config.EVAL_DIR
+                self.contexts_path = os.path.join(self.FOLDER, '2d_detection_validation_metadata.txt')
+            else:
+                self.FOLDER = config.TRAIN_DIR
+                self.contexts_path = os.path.join(self.FOLDER, '2d_detection_training_metadata.txt')
 
         self.context_set = set()
         self.segment_frames = dict()
         self.num_images = 0
         self.ds_config = config
         self.validation = validation
-        with open(os.path.join(self.FOLDER, '2d_pvps_training_frames.txt'), 'r') as f:
+        self.segmentation = segmentation
+        self.image_meta_data = image_meta_data
+
+        with open(self.contexts_path, 'r') as f:
             for line in f:
                 context_name = line.strip().split(',')[0]
                 context_frame = int(line.strip().split(',')[1])
@@ -329,46 +349,104 @@ class WaymoDataset(Dataset):
                                                         )%len(self.ds_config.SAVE_FRAMES)]
                 break
         # Load all the frames from the context file
-        frames_with_seg, camera_images = load_data_set_parquet(
-            config=self.ds_config, 
-            context_name=context_name, 
-            validation=self.validation,
-            context_frames=[context_frame]
-        )
 
-        semantic_labels_multiframe, \
-        instance_labels_multiframe, \
-        panoptic_labels = read_semantic_labels(
-            self.ds_config,
-            frames_with_seg
-        )
-        
-        camera_images_frame = read_camera_images(
-            self.ds_config,
-            camera_images
-        )
+        if self.segmentation:
+            frames_with_seg, camera_images = load_data_set_parquet(
+                config=self.ds_config, 
+                context_name=context_name, 
+                validation=self.validation,
+                context_frames=[context_frame]
+            )
 
-        # All semantic labels are in the form of object indices defined by the PALLETE
-        camera_images = camera_images_frame[0][camera_id]
-        object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
-        instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
+            semantic_labels_multiframe, \
+            instance_labels_multiframe, \
+            panoptic_labels = read_semantic_labels(
+                self.ds_config,
+                frames_with_seg
+            )
+            
+            camera_images_frame = read_camera_images(
+                self.ds_config,
+                camera_images
+            )
 
-        semantic_mask_rgb = self.get_semantic_mask(object_masks)
-        panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
-                                                                             instance_masks)
+            # All semantic labels are in the form of object indices defined by the PALLETE
+            camera_images = camera_images_frame[0][camera_id]
+            object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
+            instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
+
+            semantic_mask_rgb = self.get_semantic_mask(object_masks)
+            panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
+                                                                               instance_masks)
+        else:
+            boxes, camera_images = load_data_set_parquet(
+                config=self.ds_config, 
+                context_name=context_name, 
+                validation=self.validation,
+                context_frames=[context_frame],
+                segmentation=False
+            )
+
+            box_classes, bounding_boxes = read_box_labels(
+                self.ds_config,
+                boxes
+            )
+            
+            camera_images_frame = read_camera_images(
+                self.ds_config,
+                camera_images
+            )
+
+            camera_images = camera_images_frame[0][camera_id]
+            box_classes = box_classes[camera_id][0]
+            bounding_boxes = bounding_boxes[camera_id][0]
         
         img_data = {
             'context_name': context_name,
             'context_frame': context_frame,
             'camera_id': camera_id
         }
-        return camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data
-    
 
+        if self.segmentation:
+            if self.image_meta_data:
+                return camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data
+            else:
+                return camera_images, semantic_mask_rgb, instance_masks, object_masks
+        else:
+            if self.image_meta_data:
+                return camera_images, box_classes, bounding_boxes, img_data
+            else:
+                return camera_images, box_classes, bounding_boxes
+
+def waymo_collate_fn(data, segmentation=False, image_meta_data=False):
+
+    if not segmentation and not image_meta_data:
+        images, labels, boxes = zip(*data)
+        images = torch.stack(images, 0)
+        return images, labels, boxes
+    elif not segmentation and image_meta_data:
+        images, labels, boxes, img_data = zip(*data)
+        images = torch.stack(images, 0)
+        return images, labels, boxes, img_data
+    elif segmentation and not image_meta_data:
+        images, sem_masks, instance_masks, object_masks = zip(*data)
+        images = torch.stack(images, 0)
+        sem_masks = torch.stack(sem_masks, 0)
+        instance_masks = torch.stack(instance_masks, 0)
+        object_masks = torch.stack(object_masks, 0)
+        return images, sem_masks, instance_masks, object_masks
+    else:
+        images, sem_masks, instance_masks, object_masks, img_data = zip(*data)
+        images = torch.stack(images, 0)
+        sem_masks = torch.stack(sem_masks, 0)
+        instance_masks = torch.stack(instance_masks, 0)
+        object_masks = torch.stack(object_masks, 0)
+        return images, sem_masks, instance_masks, object_masks, img_data
 
 if __name__ == '__main__':
     config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
-
+    SEGMENTATION = False
+    IMAGE_META_DATA = False
     if config.SAVE_DATA:
         # Append the cwd to the paths in the config file
         # for keys in config.keys():
@@ -379,11 +457,24 @@ if __name__ == '__main__':
         image_mask_pickler(config, validation=False)
     else:
         # Create the dataloader and test the number of images
-        dataset = WaymoDataset(config)
+        dataset = WaymoDataset(config, image_meta_data=IMAGE_META_DATA,
+                                segmentation=SEGMENTATION)
 
         # try except
         try:
-            dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
+            collate_fn = functools.partial(
+                waymo_collate_fn, 
+                segmentation=SEGMENTATION,
+                image_meta_data=IMAGE_META_DATA
+            )
+            
+            dataloader = DataLoader(
+                dataset, 
+                batch_size=10,
+                shuffle=True, 
+                collate_fn=collate_fn
+            )
+            
             dataloader_iter = iter(dataloader)
             data = next(dataloader_iter)
             print(data[0].shape)
