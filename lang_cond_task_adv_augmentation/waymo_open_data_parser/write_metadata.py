@@ -77,9 +77,27 @@ def create_metadata_detection(config:omegaconf,
             # Convert to a list
             timestamp_micros = list(timestamp_micros)
 
+            # get the camera ID for each timestamp and context name
+            camera_ids = []
+            
+            #  group by
+            frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
+            cam_labels_per_frame_df = merged_df.groupby(
+                frame_keys, 
+                group_keys=True).agg(list)
+            
+            for i, row in cam_labels_per_frame_df.iterrows():
+                camera_ids.append(row['key.camera_name'])
+
+            # Get camera ID for the frame
             # Write the context name and number of frames to a file
-            for timestamp in timestamp_micros:
-                f.write(contexts + ',' + str(timestamp) + '\n')
+            for j, timestamp in enumerate(timestamp_micros):
+                camera_id_str = ','
+                camera_id = camera_ids[j]
+                camera_id.sort()
+                for cam in camera_id:
+                    camera_id_str += str(cam) + ','
+                f.write(contexts + ',' + str(timestamp) + camera_id_str + ' \n')
     f.close()
 if __name__=="__main__":
     config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')

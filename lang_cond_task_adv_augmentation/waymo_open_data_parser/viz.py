@@ -57,7 +57,10 @@ def visualize(config: omegaconf,
         panoptic_label_rgb = camera_segmentation_utils.panoptic_label_to_rgb(
             semantic_label_concat, instance_label_concat)
             
-        cam_with_panopitc = np.concatenate([camera_image_concat, panoptic_label_rgb], axis=0)
+        cam_with_panopitc = np.concatenate(
+            [camera_image_concat, panoptic_label_rgb],
+            axis=0
+        )
 
         plt.figure(figsize=(64, 60))
         plt.imshow(panoptic_label_rgb)
