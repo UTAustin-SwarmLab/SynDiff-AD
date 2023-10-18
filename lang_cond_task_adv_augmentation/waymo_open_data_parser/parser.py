@@ -160,6 +160,7 @@ def load_data_set_parquet(
             cam_labels_list.append(
             [v2.CameraBoxComponent.from_dict(d) 
             for d in ungroup_row(frame_keys, key_values, r)])
+            
         image_list.append(
             [v2.CameraImageComponent.from_dict(d) 
             for d in ungroup_row(frame_keys, key_values, r)])
@@ -177,7 +178,7 @@ def load_data_set_parquet(
 
 def read_semantic_labels(
         config: omegaconf, 
-        segmentation_protos_ordered: List[v2.CameraSegmentationLabelComponent]
+        segments: List[v2.CameraSegmentationLabelComponent]
         ) -> Tuple[List,List,List]:
     ''' 
     The dataset provides tracking for instances between cameras and over time.
@@ -195,7 +196,7 @@ def read_semantic_labels(
         instance_labels_multiframe: List of instance labels
 
     '''
-    segmentation_protos_flat = sum(segmentation_protos_ordered, [])
+    segmentation_protos_flat = sum(segments, [])
     panoptic_labels, num_cameras_covered, is_tracked_masks, panoptic_label_divisor =\
           camera_segmentation_utils.decode_multi_frame_panoptic_labels_from_segmentation_labels(
         segmentation_protos_flat, remap_to_global=True
@@ -206,18 +207,25 @@ def read_semantic_labels(
     NUM_CAMERA_FRAMES = 5
     semantic_labels_multiframe = []
     instance_labels_multiframe = []
-    for i in range(0, len(segmentation_protos_flat), NUM_CAMERA_FRAMES):
-        semantic_labels = []
-        instance_labels = []
-        for j in range(NUM_CAMERA_FRAMES):
+    panoptic_labels_multiframe = []
+    sum_ = 0
+    for i in range(0, len(segments)):
+        semantic_labels = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        instance_labels = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        panoptic_labels_list = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        for j in range(len(segments[i])):
             semantic_label, instance_label = camera_segmentation_utils.decode_semantic_and_instance_labels_from_panoptic_label(
-            panoptic_labels[i + j], panoptic_label_divisor)
-            semantic_labels.append(semantic_label)
-            instance_labels.append(instance_label)
+            panoptic_labels[sum_], panoptic_label_divisor)
+            cam_id = segments[i][j].key.camera_name - 1
+            semantic_labels[cam_id] = semantic_label
+            instance_labels[cam_id] = instance_label
+            panoptic_labels_list[cam_id] = panoptic_labels[sum_]
+            sum_ += 1
         semantic_labels_multiframe.append(semantic_labels)
         instance_labels_multiframe.append(instance_labels)
+        panoptic_labels_multiframe.append(panoptic_labels_list)
 
-    return semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels
+    return semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels_multiframe
 
 def read_box_labels(
         config: omegaconf, 
@@ -240,30 +248,25 @@ def read_box_labels(
     # We can further separate the semantic and instance labels from the panoptic
     # labels.
     NUM_CAMERA_FRAMES = 5
-    box_classes_frame = [] # For the entire frame per camera
-    bounding_boxes_frame = [] # For the entire frame per camera
+    box_classes_frame = [[] for _ in range(NUM_CAMERA_FRAMES)] # For the entire frame per camera
+    bounding_boxes_frame = [[] for _ in range(NUM_CAMERA_FRAMES)] # For the entire frame per camera
     try:
-        for j in range(NUM_CAMERA_FRAMES):
-            box_classes = []
-            bounding_boxes = []
-            for i in range(0, len(box_labels),1):
-                box_classes.append(box_labels[i][j].type)
-                bounding_boxes.append(
-                np.array([
+        for i in range(0, len(box_labels)):
+            for j in range(len(box_labels[i])):
+                # Get camera ID
+                cam_id = box_labels[i][j].key.camera_name - 1
+                box_classes_frame[cam_id].append(box_labels[i][j].type)
+                bounding_boxes_frame[cam_id].append([ np.array([
                     box_labels[i][j].box.center.x,
                     box_labels[i][j].box.center.y,
                     box_labels[i][j].box.size.x,
                     box_labels[i][j].box.size.y
-                ]))
-                    
-            
-            box_classes_frame.append(box_classes)
-            bounding_boxes_frame.append(bounding_boxes)
+                ])])
     except:
         print('Box labels not found')
         box_classes_frame = None
         bounding_boxes_frame = None
-        
+
     return box_classes_frame, bounding_boxes_frame
 
 
@@ -280,14 +283,15 @@ def read_camera_images(config: omegaconf,
     Returns:
         camera_images: List of camera images
     '''
-
     NUM_CAMERA_FRAMES = 5
-    camera_images_flat = sum(camera_images, [])
     camera_images_all = []
-    for i in range(0, len(camera_images_flat), NUM_CAMERA_FRAMES):
-        camera_images_frame = []
-        for j in range(NUM_CAMERA_FRAMES):
-            camera_images_frame.append(np.array(Image.open(io.BytesIO(camera_images_flat[i + j].image))))
+   
+    for i in range(0, len(camera_images)):
+        camera_images_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        for j in range(len(camera_images[i])):
+            cam_id = camera_images[i][j].key.camera_name - 1
+            camera_images_frame[cam_id] = np.array(Image.open(
+                io.BytesIO(camera_images[i][j].image)))
         camera_images_all.append(camera_images_frame)
     return camera_images_all
 
