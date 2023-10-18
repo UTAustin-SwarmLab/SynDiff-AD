@@ -205,19 +205,41 @@ class WaymoDataset(Dataset):
         self.validation = validation
         self.segmentation = segmentation
         self.image_meta_data = image_meta_data
-
+        self.context_count = dict()
+        
         with open(self.contexts_path, 'r') as f:
             for line in f:
                 context_name = line.strip().split(',')[0]
                 context_frame = int(line.strip().split(',')[1])
                 self.context_set.add(context_name)
-                if self.segment_frames.get(context_name) is None:
-                    self.segment_frames[context_name] = [context_frame]
+                if not self.segmentation:
+                    camera_ids = []
+                    available_camera_ids = line.strip().split(',')[2:-1]                    
+                    for camera_id in available_camera_ids:
+                        if (int(camera_id) - 1) in config.SAVE_FRAMES:
+                            camera_ids.append(int(camera_id))
+                            self.num_images += 1
+                            if self.context_count.get(context_name) is None:
+                                self.context_count[context_name] = 1
+                            else:
+                                self.context_count[context_name] += 1
+                    if self.segment_frames.get(context_name) is None:
+                        self.segment_frames[context_name] = [[context_frame, camera_ids]]
+                    else:
+                        self.segment_frames[context_name].append(
+                            [context_frame, camera_ids]
+                        )
                 else:
-                    self.segment_frames[context_name].append(context_frame)
-                self.num_images += 1
-                
-        self.num_images *= len(config.SAVE_FRAMES)
+                    if self.segment_frames.get(context_name) is None:
+                        self.segment_frames[context_name] = [context_frame]
+                    else:
+                        self.segment_frames[context_name].append(context_frame)
+                    self.num_images+=len(config.SAVE_FRAMES)
+                    if self.context_count.get(context_name) is None:
+                        self.context_count[context_name]=len(config.SAVE_FRAMES)
+                    else:
+                        self.context_count[context_name]+=len(config.SAVE_FRAMES)
+
         # assert len(self.camera_files) == len(self.segment_files)\
         #       == len(self.instance_files), \
         #     "The number of files in the camera, segmentation and instance folders \
@@ -336,17 +358,34 @@ class WaymoDataset(Dataset):
             raise IndexError("Index out of range")
 
         # Find the appropriate index at which the image is stored
+
         index_copy = index
         cum_sum = 0
         for k in self.segment_frames.keys():
-            cum_sum += len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
+            if self.segmentation:
+                cum_sum += len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
+            else:
+                cum_sum += self.context_count[k]
             if cum_sum>=index:
                 context_name = k
-                len_context = len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
-                context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
+                if self.segmentation:
+                    len_context = self.context_count[k]
+                    assert len_context == len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES), \
+                    "Context count does not match the number of frames in the context"
+                    context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
                                                            /len(self.ds_config.SAVE_FRAMES))]
-                camera_id = self.ds_config.SAVE_FRAMES[(index - cum_sum + len_context\
+                    camera_id = self.ds_config.SAVE_FRAMES[(index - cum_sum + len_context\
                                                         )%len(self.ds_config.SAVE_FRAMES)]
+                else:
+                    len_context = self.context_count[k]
+                    for (frame_id, camera_ids) in self.segment_frames[k]:
+                        if (index - cum_sum + len_context) < len(camera_ids):
+                            context_frame = frame_id
+                            camera_id = camera_ids[(index - cum_sum + len_context)] - 1
+                            break
+                        else:
+                            len_context -= len(camera_ids)
+               
                 break
         # Load all the frames from the context file
 
@@ -418,34 +457,37 @@ class WaymoDataset(Dataset):
             else:
                 return camera_images, box_classes, bounding_boxes
 
-def waymo_collate_fn(data, segmentation=False, image_meta_data=False):
+def waymo_collate_fn(
+        data,
+        segmentation=False, 
+        image_meta_data=False):
 
     if not segmentation and not image_meta_data:
         images, labels, boxes = zip(*data)
-        images = torch.stack(images, 0)
+        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
         return images, labels, boxes
     elif not segmentation and image_meta_data:
         images, labels, boxes, img_data = zip(*data)
-        images = torch.stack(images, 0)
+        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
         return images, labels, boxes, img_data
     elif segmentation and not image_meta_data:
         images, sem_masks, instance_masks, object_masks = zip(*data)
-        images = torch.stack(images, 0)
-        sem_masks = torch.stack(sem_masks, 0)
-        instance_masks = torch.stack(instance_masks, 0)
-        object_masks = torch.stack(object_masks, 0)
+        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
+        sem_masks = torch.tensor(np.stack(sem_masks, 0), dtype=torch.uint8)
+        instance_masks = torch.tensor(np.stack(instance_masks, 0), dtype=torch.int64)
+        object_masks = torch.tensor(np.stack(object_masks, 0), dtype=torch.int64)
         return images, sem_masks, instance_masks, object_masks
     else:
         images, sem_masks, instance_masks, object_masks, img_data = zip(*data)
-        images = torch.stack(images, 0)
-        sem_masks = torch.stack(sem_masks, 0)
-        instance_masks = torch.stack(instance_masks, 0)
-        object_masks = torch.stack(object_masks, 0)
+        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
+        sem_masks = torch.tensor(np.stack(sem_masks, 0), dtype=torch.uint8)
+        instance_masks = torch.tensor(np.stack(instance_masks, 0), dtype=torch.int64)
+        object_masks = torch.tensor(np.stack(object_masks, 0), dtype=torch.int64)
         return images, sem_masks, instance_masks, object_masks, img_data
 
 if __name__ == '__main__':
     config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
-    SEGMENTATION = False
+    SEGMENTATION = True
     IMAGE_META_DATA = False
     if config.SAVE_DATA:
         # Append the cwd to the paths in the config file
@@ -467,16 +509,15 @@ if __name__ == '__main__':
                 segmentation=SEGMENTATION,
                 image_meta_data=IMAGE_META_DATA
             )
-            
+
             dataloader = DataLoader(
                 dataset, 
                 batch_size=10,
                 shuffle=True, 
                 collate_fn=collate_fn
             )
-            
             dataloader_iter = iter(dataloader)
             data = next(dataloader_iter)
             print(data[0].shape)
         except:
-            raise ValueError("The dataloader failed to load,try creating a custom dataloader with your own collate_fn ")
+            raise ValueError("The dataloader failed to load the data")

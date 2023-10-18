@@ -13,5 +13,5 @@ VIZ_DIR: '../waymo_data/visualization/' #@param {type: "string"}
 
 NUM_CPU: 16 #@param {type: "integer"}
 #which camera frames to save
-SAVE_FRAMES: [0,1,3] #@param {type: "LIST"}
+SAVE_FRAMES: [0,1,2] #@param {type: "LIST"}
 SAVE_DATA: False
