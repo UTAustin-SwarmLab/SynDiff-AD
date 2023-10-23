@@ -5,7 +5,8 @@ def convert_pallette_segment(
         metadata:dict,
         obj_mask:np.ndarray,
         seg_mask_metadata:dict,
-        extra_mapping:dict=None,
+        extra_mapping:dict={},
+        background_included = False
         ):
     '''
     Returns an image with the dataset specific pallete converted to 
@@ -25,10 +26,13 @@ def convert_pallette_segment(
     '''
 
     object_classes_seg = seg_mask_metadata['object_classes'] #List and ID of object classes
-    pallete = np.array([[255,255,255]]+metadata['pallete'])
-    metadata['object_classes'] = tuple(['-']+list(metadata['object_classes']))
-    object_classes_inverse_mapping = inverse_mapping(metadata['object_classes'])
+    if not background_included:
+        pallete = np.array([[255,255,255]]+metadata['pallete'])
+        metadata['object_classes'] = tuple(['-']+list(metadata['object_classes']))
+    else:
+        pallete = np.array(metadata['pallete'])
 
+    object_classes_inverse_mapping = inverse_mapping(metadata['object_classes'])
     classes_to_convert = set(obj_mask.flatten().tolist())
 
     mapping = {}
