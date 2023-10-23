@@ -1,5 +1,6 @@
 # Need segmentation maks from SAM for almost near ground truth classification
-from segment_unittest.generate_image_with_segment import process
+# from segment_unittest.generate_image_with_segment import process
+from generate_image_with_segment import process
 from typing import *
 import numpy as np
 

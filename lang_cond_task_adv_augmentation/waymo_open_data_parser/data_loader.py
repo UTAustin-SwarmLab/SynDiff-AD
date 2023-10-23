@@ -4,6 +4,7 @@
 # from waymo_open_dataset.protos import camera_segmentation_submission_pb2 as submission_pb2
 # from waymo_open_dataset.wdl_limited.camera_segmentation import camera_segmentation_metrics
 
+# from waymo_open_data_parser.parser import *
 from waymo_open_data_parser.parser import *
 import pickle
 from torch.utils.data import Dataset, DataLoader
@@ -373,7 +374,7 @@ class WaymoDataset(Dataset):
                     assert len_context == len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES), \
                     "Context count does not match the number of frames in the context"
                     context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
-                                                           /len(self.ds_config.SAVE_FRAMES))]
+                                                           /len(self.ds_config.SAVE_FRAMES))-1]
                     camera_id = self.ds_config.SAVE_FRAMES[(index - cum_sum + len_context\
                                                         )%len(self.ds_config.SAVE_FRAMES)]
                 else:

@@ -4,7 +4,7 @@
 # from waymo_open_dataset.wdl_limited.camera_segmentation import camera_segmentation_metrics
 from waymo_open_dataset.utils import camera_segmentation_utils
 
-from waymo_open_data_parser.parser import *
+from parser import *
 
 from matplotlib import pyplot as plt
 import gradio as gr
@@ -77,7 +77,7 @@ def visualize(config: omegaconf,
         plt.savefig(os.path.join(config.VIZ_DIR,'cam_with_panoptic_rgb{}.png'.format(j)))
 
 if __name__ == '__main__':
-    config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
+    config = omegaconf.OmegaConf.load('config.yaml')
     config.TRAIN_DIR = os.path.join(os.getcwd(), config.TRAIN_DIR)
     config.VIZ_DIR = os.path.join(os.getcwd(), config.VIZ_DIR)
     if not os.path.exists(config.VIZ_DIR):

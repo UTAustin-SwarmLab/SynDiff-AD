@@ -100,6 +100,6 @@ def create_metadata_detection(config:omegaconf,
                 f.write(contexts + ',' + str(timestamp) + camera_id_str + ' \n')
     f.close()
 if __name__=="__main__":
-    config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
+    config = omegaconf.OmegaConf.load('config.yaml')
     create_metadata_detection(config)
     create_metadata_detection(config, validation=True)
