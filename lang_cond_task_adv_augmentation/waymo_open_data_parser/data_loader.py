@@ -367,14 +367,17 @@ class WaymoDataset(Dataset):
                 cum_sum += len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
             else:
                 cum_sum += self.context_count[k]
-            if cum_sum>=index:
+            if cum_sum>index:
                 context_name = k
                 if self.segmentation:
                     len_context = self.context_count[k]
                     assert len_context == len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES), \
                     "Context count does not match the number of frames in the context"
-                    context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
-                                                           /len(self.ds_config.SAVE_FRAMES))-1]
+                    try:
+                        context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
+                                                            /len(self.ds_config.SAVE_FRAMES))]
+                    except:
+                        raise ValueError("The index is out of range")
                     camera_id = self.ds_config.SAVE_FRAMES[(index - cum_sum + len_context\
                                                         )%len(self.ds_config.SAVE_FRAMES)]
                 else:

@@ -32,12 +32,16 @@ test_prompts = ["Night, good lighting",
                 "Foggy, good lighting",
                 "Foggy, bad lighting",
                 "Rainy, good lighting",
-                "Rainy, bad lighting"]
+                "Rainy, bad lighting",
+                "Sunny, good lighting",
+                "Sunny, bad lighting",
+                "Snow, good lighting",
+                "Snow, bad lighting",]
 
 
 text_inputs = torch.cat([clip.tokenize(description) for description in test_prompts]).to(device)
 
-config = omegaconf.OmegaConf.load('../Swarm_Lab/segmentation/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation/waymo_open_data_parser/config.yaml')
+config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
 SEGMENTATION = True
 IMAGE_META_DATA = False
 if config.SAVE_DATA:
@@ -63,8 +67,8 @@ else:
 
         dataloader = DataLoader(
             dataset, 
-            batch_size=10,
-            shuffle=True, 
+            batch_size=len(dataset),
+            shuffle=False, 
             # collate_fn=collate_fn
         )
         dataloader_iter = iter(dataloader)
