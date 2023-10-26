@@ -1,0 +1,313 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    python_version: 3.11.4
+    cli_version: 0.15.9
+    framework: lightning
+    is_jupyter_run: true
+    is_kaggle_kernel: false
+    start_time: 1693504569.26489
+    t:
+      1:
+      - 1
+      - 9
+      - 41
+      - 55
+      - 103
+      2:
+      - 1
+      - 9
+      - 41
+      - 55
+      - 103
+      3:
+      - 1
+      - 7
+      - 23
+      4: 3.11.4
+      5: 0.15.9
+      8:
+      - 1
+      - 5
+    m:
+    - 1: trainer/global_step
+      6:
+      - 3
+    - 1: val_loss_class_step
+      5: 1
+      6:
+      - 1
+    - 1: val_loss_func_step
+      5: 1
+      6:
+      - 1
+    - 1: val_loss_class_epoch
+      5: 1
+      6:
+      - 1
+    - 1: val_loss_func_epoch
+      5: 1
+      6:
+      - 1
+    - 1: epoch
+      5: 1
+      6:
+      - 1
+    - 1: train_loss_class_epoch
+      5: 1
+      6:
+      - 1
+    - 1: train_loss_func_epoch
+      5: 1
+      6:
+      - 1
+    - 1: train_loss_class_step
+      5: 1
+      6:
+      - 1
+    - 1: train_loss_func_step
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.8\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.8\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.8\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.8\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.8\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.8\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.6\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.6\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.6\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.6\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.6\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.6\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.4\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.4\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.4\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.4\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.4\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.4\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.2\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.2\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.2\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.2\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.2\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.2\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.0\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.0\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.0\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.0\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.0\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/func_model\.layers\.0\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.8\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.8\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.8\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.8\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.8\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.8\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.6\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.6\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.6\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.6\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.6\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.6\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.4\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.4\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.4\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.4\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.4\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.4\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.2\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.2\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.2\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.2\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.2\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.2\.weight.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.0\.bias._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.0\.bias.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.0\.bias.bins
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.0\.weight._type
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.0\.weight.values
+      5: 1
+      6:
+      - 1
+    - 1: gradients/model\.layers\.0\.weight.bins
+      5: 1
+      6:
+      - 1
