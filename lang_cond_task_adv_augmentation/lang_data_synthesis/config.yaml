@@ -1,0 +1,55 @@
+image:
+  dataset: 'ADE20K' # 'waymo' or 'ADE20K'
+  image_id: 16868 # 0-1000 for waymo, 0-20209 for ADE20K
+  DATASET_PATH : 'ADE20K/dataset/' # separate path for waymo
+  
+  # All waymo parameters @markdown #### Replace this path with your own tfrecords. 
+  TRAIN_DIR: '/store/datasets/waymo/training/' #@param {type:"string"}
+  #@markdown #### Replace this directory with your own dataset folder for evaluation.
+  EVAL_DIR: '/store/datasets/waymo/validation/' #@param {type: "string"}
+  #@markdown #### Replace this path with the real path. Each line of the file is the "\, \" of a frame with camera segmentation labels.
+  TEST_SET_SOURCE: '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt' #@param {type: "string"} 
+
+  #@markdown #### Replace this directory with your own testing dataset folder.
+  TEST_DIR: '/store/datasets/waymo/testing/' #@param {type: "string"}
+
+  # Visualization Path
+  VIZ_DIR: '../waymo_data/visualization/' #@param {type: "string"}
+
+  NUM_CPU: 16 #@param {type: "integer"}
+  #which camera frames to save
+  SAVE_FRAMES: [0,1,2] #@param {type: "LIST"}
+  SAVE_DATA: True
+
+control_net:
+  CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
+  MODEL_PATH: 'ControlNet/models/control_v11p_sd15_seg.pth'
+  SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
+SEGMENT_MODEL: 
+  TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
+GRADIO: True
+SAVE:
+  PATH: 'segment_unittest/test_results/'
+SD_GEN_PARAMS:
+  CONTROL : 0.1
+  NUMSAMPLES : 2
+  GUESS : False
+  DETECT_RESOLUTION : 512
+  IMAGE_RESOLUTION: 512
+  DDIMSTEPS : 20
+  SCALE: 9.0
+  SEED: 2000
+  ETA: 30.0
+  ANNOTATOR: 'Seg_OFADE20K'
+  A_PROMPT: 'Good quality, highly detailed, all objects are clear'
+  N_PROMPT: 'Bad quality, blurry, objects are not clear, blurred objects, missing objects'
+LLAVACAPTION:
+    MODELPATH: 'liuhaotian/llava-llama-2-13b-chat-lightning-preview'
+    MODELBASE: None
+    NUM_IMAGES: 'ALL' # 'ALL' or int
+    prompt: 'Caption the image in terms of the lighting conditions and weather. Produce additional
+    captions on the objects {} and their relationships.'
+    conv_mode: 'llava_llama_2'
+    BATCH_SIZE: 1
+
+    
