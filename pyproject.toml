@@ -1,0 +1,16 @@
+[project]
+
+pandas
+pytorch
+numpy==1.25.2
+matplotlib
+omegaconf==2.3.0
+waymo-open-dataset-tf-2-11-0==1.6.0
+opencv-python==4.8.0.76
+clip@git+https://github.com/openai/CLIP.git
+
+# This shell script will download and install only those deeplab2 modules which
+# are used by the WOD.
+# They are used here https://github.com/waymo-research/waymo-open-dataset/blob/master/src/waymo_open_dataset/bazel/deeplab2.BUILD
+!wget https://raw.githubusercontent.com/waymo-research/waymo-open-dataset/master/src/waymo_open_dataset/pip_pkg_scripts/install_deeplab2.sh -O - | bash
+
