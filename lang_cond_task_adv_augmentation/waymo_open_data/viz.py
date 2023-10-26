@@ -3,11 +3,15 @@
 # from waymo_open_dataset.protos import camera_segmentation_submission_pb2 as submission_pb2
 # from waymo_open_dataset.wdl_limited.camera_segmentation import camera_segmentation_metrics
 from waymo_open_dataset.utils import camera_segmentation_utils
-
+from waymo_open_dataset import v2
 from parser import *
 
 from matplotlib import pyplot as plt
 import gradio as gr
+import omegaconf
+from typing import *
+import numpy as np
+from waymo_open_data.parser import *
 
 # TODO: set up the gradio display
 def set_gradio_display():
@@ -37,8 +41,8 @@ def _pad_to_common_shape(label):
 
 
 def visualize(config: omegaconf, 
-              instance_labels_multiframe: List[open_dataset.CameraSegmentationLabel],
-              semantic_labels_multiframe: List[open_dataset.CameraSegmentationLabel],
+              instance_labels_multiframe: List[v2.CameraSegmentationLabel],
+              semantic_labels_multiframe: List[v2.CameraSegmentationLabel],
               camera_images: List[np.ndarray]) -> None:
     # TODO: Add gradio visualization 
     # Pad labels to a common size so that they can be concatenated.
