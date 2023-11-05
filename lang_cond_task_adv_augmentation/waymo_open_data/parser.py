@@ -118,13 +118,17 @@ def load_data_set_parquet(
     '''
 
     
-    cam_images_df = read(config, 'camera_image', context_name)
+    cam_images_df = read(config, 'camera_image', context_name, validation=validation)
 
     if segmentation:
-        cam_segmentation_df = read(config, 'camera_segmentation', context_name)
+        cam_segmentation_df = read(config, 'camera_segmentation', 
+                                   context_name,  
+                                   validation=validation)
         merged_df = v2.merge(cam_images_df,cam_segmentation_df, right_group=True)
     else:
-        cam_boxes_df = read(config, 'camera_box', context_name)
+        cam_boxes_df = read(config, 'camera_box', 
+                            context_name,
+                            validation=validation)
         merged_df = v2.merge(cam_images_df,cam_boxes_df, right_group=True)
 
     # Group segmentation labels into frames by context name and timestamp.
@@ -199,7 +203,7 @@ def read_semantic_labels(
     segmentation_protos_flat = sum(segments, [])
     panoptic_labels, num_cameras_covered, is_tracked_masks, panoptic_label_divisor =\
           camera_segmentation_utils.decode_multi_frame_panoptic_labels_from_segmentation_labels(
-        segmentation_protos_flat, remap_to_global=True
+        segmentation_protos_flat, remap_to_global=False
     )
 
     # We can further separate the semantic and instance labels from the panoptic

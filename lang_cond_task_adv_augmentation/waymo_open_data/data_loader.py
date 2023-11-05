@@ -123,7 +123,10 @@ def load_context_list(config, context_name, idx, total_contexts, validation):
 
         semantic_labels_multiframe, \
             instance_labels_multiframe, \
-            panoptic_labels = read_semantic_labels(config,frames_with_seg)
+            panoptic_labels = read_semantic_labels(
+                config,
+                frames_with_seg
+            )
         
         camera_images_frame = read_camera_images(config, camera_images)
     except:
@@ -490,7 +493,7 @@ def waymo_collate_fn(
         return images, sem_masks, instance_masks, object_masks, img_data
 
 if __name__ == '__main__':
-    config = omegaconf.OmegaConf.load('waymo_open_data_parser/config.yaml')
+    config = omegaconf.OmegaConf.load('waymo_open_data/config.yaml')
     SEGMENTATION = True
     IMAGE_META_DATA = False
     if config.SAVE_DATA:
@@ -506,6 +509,7 @@ if __name__ == '__main__':
         dataset = WaymoDataset(config, image_meta_data=IMAGE_META_DATA,
                                 segmentation=SEGMENTATION)
 
+        dataset[1935]
         # try except
         try:
             collate_fn = functools.partial(

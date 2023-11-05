@@ -1,4 +1,2 @@
-import data_loader
-import parser
-import write_metadata
-import viz
+from waymo_open_data.data_loader import *
+from waymo_open_data.parser import *
