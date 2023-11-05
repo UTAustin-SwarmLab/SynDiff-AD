@@ -161,7 +161,6 @@ class LLaVACaption:
                                 image_processor, 
                                 tokenizer, 
                                 self.config.LLAVACAPTION.prompt, 
-                                dataset, 
                                 j, 
                                 self.config.LLAVACAPTION.prompt, 
                                 self.config.LLAVACAPTION.conv_mode)
