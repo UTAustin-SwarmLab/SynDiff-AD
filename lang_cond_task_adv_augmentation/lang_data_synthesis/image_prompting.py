@@ -174,10 +174,10 @@ class LLaVACaption:
         return captions_df
 
 if __name__ == "__main__":
-    config = omegaconf.OmegaConf.load("segment_unittest/config.yaml")
-    dataset = WaymoDataset(config.image, image_meta_data=True)
+    config = omegaconf.OmegaConf.load("lang_data_synthesis/config.yaml")
+    dataset = WaymoDataset(config.IMAGE.WAYMO, image_meta_data=True)
     captioner = LLaVACaption(config, dataset=dataset)
-    captions = captioner.caption_dataset(config)
+    captions = captioner.caption_dataset()
 
     # Create a parquet file that stores captions of all the images in the dataset
     prompt_folder = "../waymo_data/training/"
