@@ -21,9 +21,10 @@ class AVTrain:
         self.train_config = train_config
         
         # cfg is the model config
-        cfg = Config.fromfile(train_config.model_config_path)
+        model_config_path = train_config.model_config_path + train_config.model_name + '.py'
+        cfg = Config.fromfile(model_config_path)
         print(f'Config:\n{cfg.pretty_text}')
-        cfg.work_dir = train_config.work_dir
+        cfg.work_dir = train_config.work_dir + train_config.model_name
         
         args = parse_args()
 
@@ -49,7 +50,21 @@ class AVTrain:
         cfg.resume = args.resume
 
         # Load the pretrained weights
-        cfg.load_from = train_config.load_model_paths
+        if args.resume:
+            loads = cfg.work_dir 
+            latest_path = 0
+            latest_iter = 0
+            for i in os.listdir(loads):
+                if i.endswith('.pth'):
+                    #find iter number
+                    iter = int(i.split('.')[0].split('_')[-1])
+                    if iter>latest_iter:
+                        latest_iter = iter
+                        latest_path = i
+            cfg.load_from = osp.join(loads, latest_path)
+            
+        else:
+            cfg.load_from = train_config.load_model_paths 
 
         # Set up working dir to save files and logs.
 
@@ -85,6 +100,11 @@ def parse_args():
         choices=['none', 'pytorch', 'slurm', 'mpi'],
         default='none',
         help='job launcher')
+    parser.add_argument(
+        '--config_name',
+        default='mask2former_r50_8xb2-90k_waymo-512x512',
+        help='train config in configs/train_configs/'
+    )
     # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
     # will pass the `--local-rank` parameter to `tools/train.py` instead
     # of `--local_rank`.
@@ -97,8 +117,10 @@ def parse_args():
 
     
 if __name__ == '__main__':
-
-    train_config = OmegaConf.load('avcv/configs/train_configs/mask2former_r50_8xb2-90k_waymo-512x512.yaml')
     args = parse_args()
+    config_path = 'avcv/configs/train_configs/' + args.config_name + '.yaml'
+    train_config = OmegaConf.load(
+        config_path
+    )
     trainer = AVTrain(train_config, args)
     trainer.train()
