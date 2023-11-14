@@ -27,11 +27,11 @@ control_net:
   SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
 SEGMENT_MODEL: 
   TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
-GRADIO: False
+GRADIO: True
 SAVE:
-  PATH: 'segment_unittest/test_results/'
+  PATH: 'lang_data_synthesis/test_results/'
 SYNTHESIS_PARAMS:
-  CONTROL : 0.1
+  CONTROL : 1.0
   NUMSAMPLES : 2
   GUESS : True
   DETECT_RESOLUTION : 1024

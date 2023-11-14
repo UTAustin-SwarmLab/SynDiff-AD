@@ -214,7 +214,6 @@ class ImageSynthesis:
         eta,
         det,
         apply_image_cond=False,
-        apply_uniformer=None,
         seg_mask=None,
         prompt_tokens=None):
         '''
