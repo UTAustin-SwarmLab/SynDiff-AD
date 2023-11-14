@@ -122,7 +122,8 @@ class CLIPClassifier:
                             'context_name': image_data['context_name'],
                             'context_frame': image_data['context_frame'],
                             'camera_id': image_data['camera_id'],
-                            'condition': condition}, ignore_index=True)
+                            'condition': condition},
+                           ignore_index=True)
  
         return df
     
@@ -130,17 +131,17 @@ if __name__=="__main__":
     config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
     SEGMENTATION = True
     IMAGE_META_DATA = True
-    VALIDATION = True
+    VALIDATION = False
     
     if VALIDATION:
-        FILENAME = "waymo_open_data/waymo_clip_classification_small_val.csv"
+        FILENAME = "waymo_open_data/waymo_clip_classification_small_val_.csv"
     else:
-        FILENAME = "waymo_open_data/waymo_clip_classification_small.csv"
+        FILENAME = "waymo_open_data/waymo_clip_classification_small_.csv"
     if os.path.exists(FILENAME):
         # Compute and show the number of images for each condition
         df = pd.read_csv(FILENAME)
         print(df.columns)
-        print(df.groupby(['condition']).size())
+        print(df.groupby(['condition']).size()/len(df)*100)
     else:
         dataset = WaymoDataset(config.IMAGE.WAYMO, 
                                 image_meta_data=IMAGE_META_DATA,
@@ -149,7 +150,6 @@ if __name__=="__main__":
         classifier = CLIPClassifier(config, dataset)
         df = classifier.classify()
         print(df.columns)
-        
         # Save the dataframe
         df.to_csv(FILENAME, index=False)
 
