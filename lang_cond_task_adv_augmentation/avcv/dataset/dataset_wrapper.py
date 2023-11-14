@@ -5,15 +5,21 @@ from typing import *
 
 
 from mmengine.dataset import Compose
+from mmengine.dataset import BaseDataset
 from mmseg.datasets import BaseSegDataset
 from mmseg.registry import DATASETS, TRANSFORMS
-from waymo_open_data.data_loader import WaymoDataset
+from waymo_open_data.parser import *
 from mmcv.transforms import Resize
 from mmcv.image.geometric import _scale_size
 import mmcv
 from omegaconf import DictConfig
 import numpy as np
 import os
+import tensorflow as tf
+import logging
+from mmengine.logging import print_log
+import avcv.dataset.utils as dataset_utils
+
 @TRANSFORMS.register_module()
 class AVResize(Resize):
     """Resize images & bbox & seg & keypoints & instance & object.
@@ -70,13 +76,16 @@ class AVResize(Resize):
                  keep_ratio: bool = False,
                  clip_object_border: bool = True,
                  backend: str = 'cv2',
-                 interpolation='bilinear') -> None:
+                 interpolation='bilinear',
+                 test = True) -> None:
         super().__init__(scale, scale_factor, keep_ratio, clip_object_border,
                          backend, interpolation)
-
+        self.test = test
 
     def _resize_seg(self, results: dict) -> None:
         """Resize semantic segmentation map with ``results['scale']``."""
+        if self.test:
+            return results 
         if results.get('gt_seg_map', None) is not None:
             if self.keep_ratio:
                 gt_seg = mmcv.imrescale(
@@ -131,6 +140,7 @@ class WaymoDatasetMM(BaseSegDataset):
                 validation=False,
                 segmentation= True,
                 image_meta_data=False,
+                filter_cfg: Optional[dict] = None,
                 lazy_init: bool=False,
                 indices:Optional[Union[int, Sequence[int]]] =None,
                 serialize_data:bool = True,
@@ -166,30 +176,28 @@ class WaymoDatasetMM(BaseSegDataset):
         self.label_map = self.get_label_map(new_classes)
         self.reduce_zero_label = reduce_zero_label
         self.max_refetch = max_refetch
+        self.data_bytes: np.ndarray
+        
         self._metainfo.update(
             dict(
                 label_map=self.label_map,
                 reduce_zero_label=self.reduce_zero_label))
-        # self._metainfo.update(
-        #     dict(
-        #         label_map=self.label_map))
+
         updated_palette = self._update_palette()
         self._metainfo.update(dict(palette=updated_palette))
         self._fully_initialized = False
         self._indices = indices
         self.serialize_data = serialize_data
         self.test_mode = validation
+        
+        self.pipeline = Compose(pipeline)
         if not lazy_init:
             self.full_init()
 
         if validation:
             assert self._metainfo.get('classes') is not None, \
                 'dataset metainfo `classes` should be specified when testing'
-    
-    
-
-        self.pipeline = Compose(pipeline)
-        
+         
     def waymo_init(self, 
                    segmentation: bool = True,
                    validation: bool = False,
@@ -253,6 +261,8 @@ class WaymoDatasetMM(BaseSegDataset):
                         }
                         self.data_list.append(data_info)
                     self._num_images+=len(self.waymo_config.SAVE_FRAMES)
+        # Set
+        # Get a list of GPU devices
         
         self.CLASSES_TO_PALLETTE = {
             'undefined' : [0, 0, 0],#1
@@ -352,7 +362,89 @@ class WaymoDatasetMM(BaseSegDataset):
             
         return data_list
 
+    def _waymo_get_item(
+            self, 
+            data_info: dict
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict]:
+        '''
+        Returns an item from the dataset referenced by index
+
+        Args:
+            index: The index of the item to return
+        Returns:
+            camera_images: The camera images
+            semantic_mask_rgb: The semantic mask in rgb format
+            instance_masks: The instance masks
+            object_masks: The object masks
+            img_data (dict): The image data
+        '''
+
+        # if index >= self._num_images:
+        #     index = self._rand_another()
             
+        # context_name = self.data_list[index]['context_name']
+        # context_frame = self.data_list[index]['context_frame']
+        # camera_id = self.data_list[index]['camera_id']
+        
+        context_name = data_info['context_name']
+        context_frame = data_info['context_frame']
+        camera_id = data_info['camera_id']
+        
+        camera_labels, camera_images = self.load_data_set_parquet(
+                context_name=context_name, 
+                validation=self.validation,
+                context_frames=[context_frame]
+            )
+        
+        if self.segmentation:
+            semantic_labels_multiframe, \
+            instance_labels_multiframe, \
+            panoptic_labels = camera_labels
+            
+            # All semantic labels are in the form of object indices defined by the PALLETE
+            camera_images = camera_images[0][camera_id]
+            object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
+            instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
+
+            semantic_mask_rgb = self.get_semantic_mask(object_masks)
+            # panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
+            #                                                                    instance_masks)
+        else:
+
+            box_classes, bounding_boxes = camera_labels
+            camera_images = camera_images[0][camera_id]
+            box_classes = box_classes[camera_id][0]
+            bounding_boxes = bounding_boxes[camera_id][0]
+        
+        if self.segmentation:
+            data_info['img'] = camera_images
+            data_info['gt_seg_map'] = object_masks
+            data_info['gt_instance_map'] = instance_masks
+            data_info['gt_object_map'] = semantic_mask_rgb
+            data_info['ori_shape'] = camera_images.shape[:2]
+            return data_info
+        
+        else:
+            data_info['img'] = camera_images
+            data_info['gt_bboxes'] = bounding_boxes
+            data_info['gt_labels'] = box_classes
+            data_info['ori_shape'] = camera_images.shape[:2]
+            return data_info
+ 
+    
+    def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
+        '''
+        Returns the semantic mask from the object mask
+
+        Args:
+            object_mask: The object mask to extract the semantic mask from
+        
+        Returns:
+            semantic_mask: The semantic mask of the object mask
+        '''
+        semantic_mask = self.color_map[object_mask.squeeze()]
+        return semantic_mask
+        
     def prepare_data(self, idx) -> Any:
         """Get data processed by ``self.pipeline``.
 
@@ -363,41 +455,221 @@ class WaymoDatasetMM(BaseSegDataset):
             Any: Depends on ``self.pipeline``.
         """
         data_dict = self.get_data_info(idx)
-        if self.waymo_ds.segmentation:
-            if self.waymo_ds.image_meta_data:
-                images, sem_masks, instance_masks, object_masks, image_metadata = self.waymo_ds[idx]
-                data_dict['img'] = images
-                data_dict['gt_seg_map'] = object_masks
-                data_dict['gt_instance_map'] = instance_masks
-                data_dict['gt_object_map'] = sem_masks
-                for key, value in image_metadata.items():
-                    data_dict[key] = value
-                
-            else:     
-                images, sem_masks, instance_masks, object_masks = self.waymo_ds[idx]
-                data_dict['img'] = images
-                data_dict['gt_seg_map'] = object_masks
-                data_dict['gt_instance_map'] = instance_masks
-                data_dict['gt_object_map'] = sem_masks
-                
-                
-        elif not self.waymo_ds.segmentation:
-            if self.waymo_ds.image_meta_data:
-                images, labels, boxes, image_metadata = self.waymo_ds[idx]
-                data_dict['img'] = images
-                data_dict['gt_bboxes'] = boxes
-                data_dict['gt_labels'] = labels
-                for key, value in image_metadata.items():
-                    data_dict[key] = value
-                
-            else:
-                images, labels, boxes = self.waymo_ds[idx]
-                data_dict['img'] = images
-                data_dict['gt_bboxes'] = boxes
-                data_dict['gt_labels'] = labels
-        
-        data_dict = self.pipeline(data_dict)       
+        data_dict = self._waymo_get_item(data_dict)    
+        data_dict = self.pipeline(data_dict)      
+         
         return data_dict
+    
+    def __getitem__(self, idx: int) -> dict:
+        """Get the idx-th image and data information of dataset after
+        ``self.pipeline``, and ``full_init`` will be called if the dataset has
+        not been fully initialized.
+
+        During training phase, if ``self.pipeline`` get ``None``,
+        ``self._rand_another`` will be called until a valid image is fetched or
+         the maximum limit of refetech is reached.
+
+        Args:
+            idx (int): The index of self.data_list.
+
+        Returns:
+            dict: The idx-th image and data information of dataset after
+            ``self.pipeline``.
+        """
+        # Performing full initialization by calling `__getitem__` will consume
+        # extra memory. If a dataset is not fully initialized by setting
+        # `lazy_init=True` and then fed into the dataloader. Different workers
+        # will simultaneously read and parse the annotation. It will cost more
+        # time and memory, although this may work. Therefore, it is recommended
+        # to manually call `full_init` before dataset fed into dataloader to
+        # ensure all workers use shared RAM from master process.
+        if not self._fully_initialized:
+            print_log(
+                'Please call `full_init()` method manually to accelerate '
+                'the speed.',
+                logger='current',
+                level=logging.WARNING)
+            self.full_init()
+
+        if self.test_mode:
+            data = self.prepare_data(idx)
+            if data is None:
+                raise Exception('Test time pipline should not get `None` '
+                                'data_sample')
+            return data
+
+        for _ in range(self.max_refetch + 1):
+            data = self.prepare_data(idx)
+            # Broken images or random augmentations may cause the returned data
+            # to be None
+            if data is None:
+                idx = self._rand_another()
+                continue
+            return data
+
+        raise Exception(f'Cannot find valid image after {self.max_refetch}! '
+                        'Please check your image path and pipeline')
+    
+    def load_data_set_parquet(
+        self,
+        context_name: str,
+        validation=False,
+        context_frames:List = None) -> Tuple[List[v2.CameraImageComponent], List[Any]]:
+        '''
+        Load datset from parquet files for segmentation and camera images
+        
+        Args:
+            config: OmegaConf DictConfig object with the data directory and file name (see config,yaml)
+
+        Returns:
+        
+        cam_segmentation_list: List of segmentation labels ordered by the camera order
+        '''
+
+    
+        cam_images_df = read(self.waymo_config, 'camera_image', context_name, validation=validation)
+
+        if self.segmentation:
+            cam_segmentation_df = read(self.waymo_config, 'camera_segmentation', 
+                                    context_name,  
+                                    validation=validation)
+            merged_df = v2.merge(cam_images_df,cam_segmentation_df, right_group=True)
+        else:
+            cam_boxes_df = read(self.waymo_config, 'camera_box', 
+                                context_name,
+                                validation=validation)
+            merged_df = v2.merge(cam_images_df,cam_boxes_df, right_group=True)
+
+        # Group segmentation labels into frames by context name and timestamp.
+        frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
+
+        if context_frames is None:
+            #frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
+            cam_labels_per_frame_df = merged_df.groupby(
+                frame_keys, group_keys=False).agg(list)
+        else:
+            
+            #frame_keys = ['key.segment_context_name', 'key.frame_timestamp_micros']
+            # cam_segmentation_per_frame_df = merged_df.groupby(
+            #     frame_keys, group_keys=True).agg(list)
+            
+            # filter out the frames that are not in the context_frames
+            # cam_labels_per_frame_df = merged_df.reset_index()
+            cam_labels_per_frame_df = merged_df.set_index('key.frame_timestamp_micros')
+            cam_labels_per_frame_df = cam_labels_per_frame_df.loc[context_frames]
+            cam_labels_per_frame_df = cam_labels_per_frame_df.groupby(
+                frame_keys, group_keys=False).agg(list)
+            
+        cam_labels_list = []
+        image_list = []
+        for i, (key_values, r) in enumerate(cam_labels_per_frame_df.iterrows()):
+            # Read three sequences of 5 camera images for this demo.
+            # Store a segmentation label component for each camera.
+            if self.segmentation:
+                cam_labels_list.append(
+                    [v2.CameraSegmentationLabelComponent.from_dict(d) 
+                    for d in ungroup_row(frame_keys, key_values, r)])
+            else:
+                cam_labels_list.append(
+                [v2.CameraBoxComponent.from_dict(d) 
+                for d in ungroup_row(frame_keys, key_values, r)])
+                
+            image_list.append(
+                [v2.CameraImageComponent.from_dict(d) 
+                for d in ungroup_row(frame_keys, key_values, r)])
+        
+        parsed_cam_labels = self.read_labels(cam_labels_list)
+        parsed_cam_images = self.read_camera_images(image_list)
+        return parsed_cam_labels, parsed_cam_images
+    
+    def read_labels(
+        self, 
+        cam_labels: Union[List[v2.CameraBoxComponent],
+                    List[v2.CameraSegmentationLabelComponent]]
+            ) -> Any:
+        
+        if self.segmentation:
+            segments = cam_labels
+            segmentation_protos_flat = sum(segments, [])
+            panoptic_labels, num_cameras_covered, is_tracked_masks, panoptic_label_divisor =\
+                dataset_utils.decode_multi_frame_panoptic_labels_from_segmentation_labels(
+                segmentation_protos_flat, remap_to_global=False
+            )
+
+            # We can further separate the semantic and instance labels from the panoptic
+            # labels.
+            NUM_CAMERA_FRAMES = 5
+            semantic_labels_multiframe = []
+            instance_labels_multiframe = []
+            panoptic_labels_multiframe = []
+            sum_ = 0
+            for i in range(0, len(segments)):
+                semantic_labels = [[] for _ in range(NUM_CAMERA_FRAMES)]
+                instance_labels = [[] for _ in range(NUM_CAMERA_FRAMES)]
+                panoptic_labels_list = [[] for _ in range(NUM_CAMERA_FRAMES)]
+                for j in range(len(segments[i])):
+                    semantic_label, instance_label = \
+                        camera_segmentation_utils.\
+                            decode_semantic_and_instance_labels_from_panoptic_label(
+                    panoptic_labels[sum_], panoptic_label_divisor)
+                    cam_id = segments[i][j].key.camera_name - 1
+                    semantic_labels[cam_id] = semantic_label
+                    instance_labels[cam_id] = instance_label
+                    panoptic_labels_list[cam_id] = panoptic_labels[sum_]
+                    sum_ += 1
+                semantic_labels_multiframe.append(semantic_labels)
+                instance_labels_multiframe.append(instance_labels)
+                panoptic_labels_multiframe.append(panoptic_labels_list)
+
+            return semantic_labels_multiframe, instance_labels_multiframe, panoptic_labels_multiframe
+        else:
+            NUM_CAMERA_FRAMES = 5
+            box_labels = []
+            box_classes_frame = [[] for _ in range(NUM_CAMERA_FRAMES)] # For the entire frame per camera
+            bounding_boxes_frame = [[] for _ in range(NUM_CAMERA_FRAMES)] # For the entire frame per camera
+            try:
+                for i in range(0, len(box_labels)):
+                    for j in range(len(box_labels[i])):
+                        # Get camera ID
+                        cam_id = box_labels[i][j].key.camera_name - 1
+                        box_classes_frame[cam_id].append(box_labels[i][j].type)
+                        bounding_boxes_frame[cam_id].append([ np.array([
+                            box_labels[i][j].box.center.x,
+                            box_labels[i][j].box.center.y,
+                            box_labels[i][j].box.size.x,
+                            box_labels[i][j].box.size.y
+                        ])])
+            except:
+                print('Box labels not found')
+                box_classes_frame = None
+                bounding_boxes_frame = None
+
+            return box_classes_frame, bounding_boxes_frame   
+    
+    def read_camera_images(self,
+                        camera_images: List[v2.CameraImageComponent]
+                        ) -> List[np.ndarray]:
+        '''
+        Read camera images from the dataset
+
+        Args:
+            config: omega config from the config.yaml file
+            camera_images: List of camera images
+        
+        Returns:
+            camera_images: List of camera images
+        '''
+        NUM_CAMERA_FRAMES = 5
+        camera_images_all = []
+    
+        for i in range(0, len(camera_images)):
+            camera_images_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+            for j in range(len(camera_images[i])):
+                cam_id = camera_images[i][j].key.camera_name - 1
+                camera_images_frame[cam_id] = np.array(Image.open(
+                    io.BytesIO(camera_images[i][j].image)))
+            camera_images_all.append(camera_images_frame)
+        return camera_images_all
     
 if __name__ == '__main__':
     raise NotImplementedError
