@@ -1,5 +1,9 @@
 from typing import *
 import numpy as np
+import datetime
+import csv
+from pathlib import Path
+import pandas as pd
 
 def convert_pallette_segment(
         metadata:dict,
@@ -80,3 +84,67 @@ def inverse_mapping(classes:List):
     Returns a dictionary with the inverse mapping of the classes
     '''
     return {v:k for k,v in enumerate(classes)}
+
+
+def get_file_or_dir_with_datetime(base_name, ext=".",
+                                  inc_current_time=True):
+    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if inc_current_time:
+        return f"{base_name}_{current_time}{ext}"
+    else:
+        return f"{base_name}{ext}"
+
+
+def write_to_csv_from_dict(
+    dict_data: dict, 
+    csv_file_path: str, 
+    file_name="data.csv"
+):
+    """Write dictionary to csv file."""
+    csv_file_name = Path(csv_file_path) / file_name
+
+    with open(csv_file_name, mode="a", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=dict_data.keys())
+
+        if not csv_file_name.exists():
+            # If file does not exist, write header
+            writer.writeheader()
+        writer.writerow(dict_data)
+
+def get_df_from_csv(csv_file_path: str, file_name="data.csv", header=None):
+    csv_file_name = Path(csv_file_path) / file_name
+    if not csv_file_name.exists():
+        return None
+    else:
+        # If the file exists, read the CSV into a DataFrame
+
+        # Add the first column as the row due to problem with the csv file
+
+        df = pd.read_csv(csv_file_name)
+        if header is not None and header.keys() != df.columns.tolist():
+            df.loc[-1] = df.columns.tolist()
+            df.index = df.index + 1
+            df = df.sort_index()
+
+        if header is not None:
+            df.columns = header.keys()
+            for col in header:
+                if col in df.columns:
+                    df[col] = df[col].astype(header[col])
+
+    return df
+
+def row_in_csv(
+    df: pd.DataFrame, 
+    dict_data: Dict[str, Any],
+    keys_to_compare: List[str]
+):
+    if df is None:
+        return False
+
+    # Define the keys you want to compare
+
+    # Check if the data already exists in the DataFrame for the selected keys
+    exists = df[keys_to_compare].eq(pd.Series(dict_data)[keys_to_compare]).all(axis=1).any()
+    
+    return exists

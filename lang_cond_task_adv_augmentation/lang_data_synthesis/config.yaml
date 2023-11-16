@@ -52,9 +52,12 @@ LLAVACAPTION:
     conv_mode: 'llava_llama_2'
     BATCH_SIZE: 1
 ROBUSTIFICATION:       
-  test_prompts : [
+  test_conditions : [
     ["Day", "Night"],
-    ["Sunny","Cloudy", "Foggy", "Rainy", "Snowy"]
+    ["Clear", "Cloudy", "Foggy", "Rainy", "Snowy"]
   ]
   dataset_metadata_path: ""
-    
+  classify: False
+  prompt_add: ['An image taken by a camera during {} time.',
+                    'An image taken by a camera during {} weather conditions.'                                      ]
+  batch_size: 8
