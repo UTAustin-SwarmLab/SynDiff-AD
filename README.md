@@ -13,20 +13,20 @@ This is a template repository. Please initialize your python project using this 
    Use the conda env to develop further
 
 6.  To install and setup mmsegmentation
-'''
+   ```
    pip install -U openmim
    mim install mmengine
    mim install "mmcv>=2.0.0"
    pip install "mmdet>=3.0.0rc4"
    pip install "mmsegmentation>=1.0.0"
-'''
+   ```
    Ignore the dependecy conflict of numpy 1.21.5 and pip install numpy==1.23.1- works seamlessly
 
 7. Use the following commands to download the model weights for different segmentation models [higly recommended to finetune models]
 
-'''
+   ```
 mim download mmsegmentation --config mask2former_swin-t_8xb2-160k_ade20k-512x512 --dest avcv/model_weights
-'''
+   ```
 Replace the  --config with any model config you want installed. Refer to https://github.com/open-mmlab/mmsegmentation/tree/main/configs for more configs.
 
 8. Training models with mmseg. We provide a sample command for training a model config with mmseg.
@@ -34,17 +34,20 @@ Replace the  --config with any model config you want installed. Refer to https:/
 First locate a model config from avcv/configs/models
 Confirm .yaml config exists for your selected model in avcv/config/train_configs
 
-'''
+   ```
  PYTHONPATH=/home/hg22723/projects/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation CUDA_VISIBLE_DEVICES=0,1 python3 train.py --config mask2former_swin-t_8xb2-160k_ade20k-512x512 
-'''
+   ```
 
-8. File structure for using lang_data_synthesis
+9. File structure for using lang_data_synthesis
 
 Scripts not mentioned here are Work in Progress
 
 a - image_classification.py - classifies the images as per test conditions specified in lang_data_synthesis/config.yaml
+
 b - image_prompting.py - captioning images using LLAVA-1.1 -LLAVA-1.5 upgrade pending
+
 c - imgseg_synthesis.py - single image conditional synthesis using controlnet
+
 d - utils.py - utility functions
 
 
