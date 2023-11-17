@@ -25,7 +25,7 @@ This is a template repository. Please initialize your python project using this 
 7. Use the following commands to download the model weights for different segmentation models [higly recommended to finetune models]
 
    ```
-mim download mmsegmentation --config mask2former_swin-t_8xb2-160k_ade20k-512x512 --dest avcv/model_weights
+   mim download mmsegmentation --config mask2former_swin-t_8xb2-160k_ade20k-512x512 --dest avcv/model_weights
    ```
 Replace the  --config with any model config you want installed. Refer to https://github.com/open-mmlab/mmsegmentation/tree/main/configs for more configs.
 
@@ -35,7 +35,7 @@ First locate a model config from avcv/configs/models
 Confirm .yaml config exists for your selected model in avcv/config/train_configs
 
    ```
- PYTHONPATH=/home/hg22723/projects/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation CUDA_VISIBLE_DEVICES=0,1 python3 train.py --config mask2former_swin-t_8xb2-160k_ade20k-512x512 
+   PYTHONPATH=/home/hg22723/projects/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation CUDA_VISIBLE_DEVICES=0,1 python3 train.py --config mask2former_swin-t_8xb2-160k_ade20k-512x512 
    ```
 
 9. File structure for using lang_data_synthesis
