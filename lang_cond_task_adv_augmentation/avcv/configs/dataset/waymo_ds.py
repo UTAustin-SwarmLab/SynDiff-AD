@@ -6,11 +6,23 @@ crop_size = (960, 640)
 num_classes = 29
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
-    dict(type='PackSegInputs')
+    dict(type='PackSegInputs', meta_keys=['context_name',
+                                          'context_frame',
+                                          'camera_id',
+                                          'ori_shape',
+                                          'img_shape',
+                                          'scale_factor',
+                                          'reduce_zero_label'])
 ]
 test_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False, test=True),
-    dict(type='PackSegInputs')
+    dict(type='PackSegInputs', meta_keys=['context_name',
+                                          'context_frame',
+                                          'camera_id',
+                                          'ori_shape',
+                                          'img_shape',
+                                          'scale_factor',
+                                          'reduce_zero_label'])
 ]
 train_dataloader = dict(
     batch_size=4,

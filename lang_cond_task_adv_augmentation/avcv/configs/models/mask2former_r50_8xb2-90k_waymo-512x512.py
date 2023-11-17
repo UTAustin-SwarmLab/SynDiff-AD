@@ -3,11 +3,23 @@ crop_size = (512, 512)
 
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
-    dict(type='PackSegInputs')
+    dict(type='PackSegInputs', meta_keys=['context_name',
+                                          'context_frame',
+                                          'camera_id',
+                                          'ori_shape',
+                                          'img_shape',
+                                          'scale_factor',
+                                          'reduce_zero_label'])
 ]
 test_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False, test=True),
-    dict(type='PackSegInputs')
+    dict(type='PackSegInputs', meta_keys=['context_name',
+                                          'context_frame',
+                                          'camera_id',
+                                          'ori_shape',
+                                          'img_shape',
+                                          'scale_factor',
+                                          'reduce_zero_label'])
 ]
 data_preprocessor = dict(
     type='SegDataPreProcessor',
@@ -21,11 +33,11 @@ data_preprocessor = dict(
     )
 
 train_dataloader = dict(
-    batch_size=4,
-    num_workers=4,
+    batch_size=3,
+    num_workers=3,
   )
 
 val_dataloader = dict(
-    batch_size=4,
-    num_workers=4,
+    batch_size=3,
+    num_workers=3,
    )
