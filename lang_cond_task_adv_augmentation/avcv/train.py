@@ -13,6 +13,7 @@ import os
 from mmengine.logging import print_log
 from argparse import ArgumentParser
 import torch
+
 class AVTrain:
     
     def __init__(self,
@@ -24,9 +25,7 @@ class AVTrain:
         model_config_path = train_config.model_config_path + train_config.model_name + '.py'
         cfg = Config.fromfile(model_config_path)
         print(f'Config:\n{cfg.pretty_text}')
-        cfg.work_dir = train_config.work_dir + train_config.model_name
-        
-        args = parse_args()
+        cfg.work_dir = train_config.work_dir + train_config.model_name + args.dir_tag
 
         # load config
         cfg.launcher = args.launcher
@@ -67,7 +66,6 @@ class AVTrain:
             cfg.load_from = train_config.load_model_paths 
 
         # Set up working dir to save files and logs.
-
         cfg.train_cfg.max_iters = train_config.max_iters
         cfg.train_cfg.val_interval = train_config.val_interval
         cfg.default_hooks.logger.interval = train_config.logger_interval
@@ -78,7 +76,6 @@ class AVTrain:
         print(f'Config:\n{cfg.pretty_text}')
         self.engine = Runner.from_cfg(cfg)
         
-       
     def train(self):
         self.engine.train()
 
@@ -105,6 +102,12 @@ def parse_args():
         default='mask2former_r50_8xb2-90k_waymo-512x512',
         help='train config in configs/train_configs/'
     )
+    parser.add_argument(
+        '--dir_tag',
+        default='',
+        help='tag for new directory to save model'
+    )
+    
     # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
     # will pass the `--local-rank` parameter to `tools/train.py` instead
     # of `--local_rank`.
