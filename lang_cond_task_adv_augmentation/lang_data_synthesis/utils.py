@@ -4,6 +4,7 @@ import datetime
 import csv
 from pathlib import Path
 import pandas as pd
+import torch
 
 def convert_pallette_segment(
         metadata:dict,
@@ -148,3 +149,16 @@ def row_in_csv(
     exists = df[keys_to_compare].eq(pd.Series(dict_data)[keys_to_compare]).all(axis=1).any()
     
     return exists
+
+
+def to_numpy(tensor):
+    if isinstance(tensor, torch.Tensor):
+        return tensor.detach().cpu().numpy()
+    else:
+        return tensor
+    
+def to_cpu(tensor):
+    if isinstance(tensor, torch.Tensor):
+        return tensor.detach().cpu()
+    else:
+        return tensor
