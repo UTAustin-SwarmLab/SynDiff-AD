@@ -27,21 +27,21 @@ control_net:
   SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
 SEGMENT_MODEL: 
   TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
-GRADIO: True
+GRADIO: False
 SAVE:
   PATH: 'lang_data_synthesis/test_results/'
 SYNTHESIS_PARAMS:
   CONTROL : 1.0
-  NUMSAMPLES : 2
+  NUMSAMPLES : 3
   GUESS : True
-  DETECT_RESOLUTION : 1024
+  DETECT_RESOLUTION : 512
   IMAGE_RESOLUTION: 512
   DDIMSTEPS : 30
   SCALE: 9.0
   SEED: 2000
-  ETA: 50.0
+  ETA: 0.00
   ANNOTATOR: 'Seg_OFADE20K'
-  A_PROMPT: 'camera like quality, detailed, same textures, maintain all semantics'
+  A_PROMPT: 'picture is taken from a camera, detailed, same textures'
   N_PROMPT: 'disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality'
 LLAVACAPTION:
     MODELPATH: 'liuhaotian/llava-llama-2-13b-chat-lightning-preview'
@@ -53,11 +53,18 @@ LLAVACAPTION:
     BATCH_SIZE: 1
 ROBUSTIFICATION:       
   test_conditions : [
-    ["Day", "Night"],
-    ["Clear", "Cloudy", "Foggy", "Rainy", "Snowy"]
+    # ["Day", "Night"],
+    ["Clear", "Cloudy", "Rainy"]
   ]
   dataset_metadata_path: ""
-  classify: False
-  prompt_add: ['An image taken by a camera during {} time.',
-                    'An image taken by a camera during {} weather conditions.'                                      ]
+  classify: True
+  prompt_add: [
+    #'An image taken by a camera during {} time.',
+    'An image taken by a camera during {} weather conditions.'                                      ]
   batch_size: 8
+SYN_DATASET_GEN:
+  target_prob_soft: 0.005
+  num_synthetic_images: 1000
+  dataset_path: '/store/harsh/data/waymo_synthetic/'
+  segmentation: True
+  conditions_path: 'waymo_open_data/'

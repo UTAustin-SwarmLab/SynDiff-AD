@@ -14,6 +14,29 @@ num_classes = 29
 pretrained = 'https://download.openmmlab.com/mmsegmentation/v0.5/pretrain/swin/swin_tiny_patch4_window7_224_20220317-1cdeb081.pth'  # noqa
 depths = [2, 2, 6, 2]
 num_classes = 29
+train_pipeline = [
+    dict(type='AVResize', scale=crop_size, keep_ratio=False),
+    dict(type='PackSegInputs', meta_keys=['context_name',
+                                          'context_frame',
+                                          'camera_id',
+                                          'ori_shape',
+                                          'img_shape',
+                                          'scale_factor',
+                                          'condition',
+                                          'reduce_zero_label'])
+]
+test_pipeline = [
+    dict(type='AVResize', scale=crop_size, keep_ratio=False, test=True),
+    dict(type='PackSegInputs', meta_keys=['context_name',
+                                          'context_frame',
+                                          'camera_id',
+                                          'ori_shape',
+                                          'img_shape',
+                                          'scale_factor',
+                                          'condition',
+                                          'reduce_zero_label'])
+]
+
 model = dict(
     data_preprocessor=data_preprocessor,
     backbone=dict(
@@ -80,11 +103,18 @@ visualizer = dict(
         dict(type='LocalVisBackend'),
     ])
 train_dataloader = dict(
-    batch_size=3,
-    num_workers=3,
+    batch_size=4,
+    num_workers=4,
+    dataset=dict(
+    pipeline=train_pipeline,
+    )
   )
 
 val_dataloader = dict(
-    batch_size=3,
-    num_workers=3,
+    batch_size=4,
+    num_workers=4,
+    dataset=dict(
+    pipeline=test_pipeline,
+    )
    )
+test_dataloader = val_dataloader

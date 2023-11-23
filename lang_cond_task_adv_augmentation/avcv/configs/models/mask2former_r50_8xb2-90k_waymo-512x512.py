@@ -9,6 +9,7 @@ train_pipeline = [
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
+                                          'condition',
                                           'reduce_zero_label'])
 ]
 test_pipeline = [
@@ -19,6 +20,7 @@ test_pipeline = [
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
+                                          'condition',
                                           'reduce_zero_label'])
 ]
 data_preprocessor = dict(
@@ -33,11 +35,20 @@ data_preprocessor = dict(
     )
 
 train_dataloader = dict(
-    batch_size=3,
-    num_workers=3,
+    batch_size=8,
+    num_workers=8,
+    dataset=dict(
+        pipeline=train_pipeline,
+        )
   )
 
 val_dataloader = dict(
-    batch_size=3,
-    num_workers=3,
+    batch_size=16,
+    num_workers=16,
+        dataset=dict(
+        pipeline=train_pipeline,
+    )
    )
+
+test_dataloader = val_dataloader
+model = dict(data_preprocessor=data_preprocessor)
