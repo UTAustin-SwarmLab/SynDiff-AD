@@ -74,7 +74,7 @@ def image_mask_pickler(config, validation=False):
     context_pooler.close()
     context_pooler.join()
    
-    
+
     # camera_images_list = []
     # semantic_masks_lists = []
     # instance_masks_list = []
@@ -179,7 +179,7 @@ class WaymoDataset(Dataset):
     ds_length: int
     ds_config: omegaconf
     segmentation: bool
-    image_meta_data: bool # Whether to return the image meta data or not when accessing items
+    image_meta_data: bool # Whether to return the image meta data with weather conditions or not when accessing items
 
     def __init__(self, config, 
                  validation=False, 
@@ -202,47 +202,71 @@ class WaymoDataset(Dataset):
                 self.FOLDER = config.TRAIN_DIR
                 self.contexts_path = os.path.join(self.FOLDER, '2d_detection_training_metadata.txt')
 
-        self.context_set = set()
-        self.segment_frames = dict()
-        self.num_images = 0
+        #self.context_set = set()
+        self._data_list = []
+        #self.segment_frames = dict()
+        self._num_images = 0
         self.ds_config = config
         self.validation = validation
         self.segmentation = segmentation
         self.image_meta_data = image_meta_data
-        self.context_count = dict()
+        #self.context_count = dict()
         
         with open(self.contexts_path, 'r') as f:
             for line in f:
                 context_name = line.strip().split(',')[0]
                 context_frame = int(line.strip().split(',')[1])
-                self.context_set.add(context_name)
                 if not self.segmentation:
                     camera_ids = []
-                    available_camera_ids = line.strip().split(',')[2:-1]                    
-                    for camera_id in available_camera_ids:
-                        if (int(camera_id) - 1) in config.SAVE_FRAMES:
-                            camera_ids.append(int(camera_id))
-                            self.num_images += 1
-                            if self.context_count.get(context_name) is None:
-                                self.context_count[context_name] = 1
-                            else:
-                                self.context_count[context_name] += 1
-                    if self.segment_frames.get(context_name) is None:
-                        self.segment_frames[context_name] = [[context_frame, camera_ids]]
-                    else:
-                        self.segment_frames[context_name].append(
-                            [context_frame, camera_ids]
-                        )
+                    available_camera_ids = line.strip().split(',')[2:-1]
+                    available_camera_ids = [int(x) - 1 for x in available_camera_ids]  
+                    common_camera_ids = list(set(available_camera_ids).intersection(set(config.SAVE_FRAMES)))
+                    
+                    self._num_images += len(common_camera_ids)
+
+                    for camera_id in common_camera_ids:
+                        data_info = {
+                            'context_name': context_name,
+                            'context_frame': context_frame,
+                            'camera_id': camera_id
+                        }
+                        self._data_list.append(data_info)
+                        
+                    # DEPRECIATED
+                    # for camera_id in available_camera_ids:
+                    #     if (int(camera_id) - 1) in config.SAVE_FRAMES:
+                    #         camera_ids.append(int(camera_id))
+                    #         self.num_images += 1
+                    #         if self.context_count.get(context_name) is None:
+                    #             self.context_count[context_name] = 1
+                    #         else:
+                    #             self.context_count[context_name] += 1
+                    # if self.segment_frames.get(context_name) is None:
+                    #     self.segment_frames[context_name] = [[context_frame, camera_ids]]
+                    # else:
+                    #     self.segment_frames[context_name].append(
+                    #         [context_frame, camera_ids]
+                    #     )
                 else:
-                    if self.segment_frames.get(context_name) is None:
-                        self.segment_frames[context_name] = [context_frame]
-                    else:
-                        self.segment_frames[context_name].append(context_frame)
-                    self.num_images+=len(config.SAVE_FRAMES)
-                    if self.context_count.get(context_name) is None:
-                        self.context_count[context_name]=len(config.SAVE_FRAMES)
-                    else:
-                        self.context_count[context_name]+=len(config.SAVE_FRAMES)
+                    for camera_id in config.SAVE_FRAMES:
+                        data_info = {
+                            'context_name': context_name,
+                            'context_frame': context_frame,
+                            'camera_id': camera_id
+                        }
+                        self._data_list.append(data_info)
+                    self._num_images+=len(config.SAVE_FRAMES)
+                    
+                    #DEPRECIATED
+                    # if self.segment_frames.get(context_name) is None:
+                    #     self.segment_frames[context_name] = [context_frame]
+                    # else:
+                    #     self.segment_frames[context_name].append(context_frame)
+                    # self.num_images+=len(config.SAVE_FRAMES)
+                    # if self.context_count.get(context_name) is None:
+                    #     self.context_count[context_name]=len(config.SAVE_FRAMES)
+                    # else:
+                    #     self.context_count[context_name]+=len(config.SAVE_FRAMES)
 
         # assert len(self.camera_files) == len(self.segment_files)\
         #       == len(self.instance_files), \
@@ -255,47 +279,121 @@ class WaymoDataset(Dataset):
         # RGB colors used to visualize each semantic segmentation class.
         
         self.CLASSES_TO_PALLETTE = {
-            'undefined' : [0, 0, 0],
-            'ego_vehicle': [102, 102, 102],
-            'car': [0, 0, 142], 
-            'truck': [0, 0, 70], 
-            'bus': [0, 60, 100],
-            'other_large_vehicle': [61, 133, 198],
-            'bicycle': [119, 11, 32],
-            'motorcycle': [0, 0, 230],
-            'trailer': [111, 168, 220],
-            'pedestrian': [220, 20, 60],
-            'cyclist': [255, 0, 0],
-            'motorcyclist': [180, 0, 0],
-            'bird': [127, 96, 0],
-            'ground_animal': [91, 15, 0],
-            'construction_cone_pole': [230, 145, 56],
-            'pole': [153, 153, 153],
-            'pedestrian_object': [234, 153, 153],
-            'sign': [246, 178, 107],
-            'traffic_light': [250, 170, 30],
-            'building': [70, 70, 70],
-            'road': [128, 64, 128],
-            'lane_marker': [234, 209, 220],
-            'road_marker': [217, 210, 233],
-            'sidewalk': [244, 35, 232],
-            'vegetation': [107, 142, 35],
-            'sky': [70, 130, 180],
-            'ground': [102, 102, 102],
-            'dynamic': [102, 102, 102],
-            'static': [102, 102, 102]
+            'undefined' : [0, 0, 0],#1
+            'ego_vehicle': [102, 102, 102],#2
+            'car': [0, 0, 142], # coco supported
+            'truck': [0, 0, 70], # coco supported
+            'bus': [0, 60, 100],# coco supported
+            'other_large_vehicle': [61, 133, 198], # unsupported
+            'bicycle': [119, 11, 32],#
+            'motorcycle': [0, 0, 230],#
+            'trailer': [111, 168, 220],#
+            'pedestrian': [220, 20, 60],#10
+            'cyclist': [255, 0, 0],#
+            'motorcyclist': [180, 0, 0],#
+            'bird': [127, 96, 0],#
+            'ground_animal': [91, 15, 0],#
+            'construction_cone_pole': [230, 145, 56],#15
+            'pole': [153, 153, 153],#
+            'pedestrian_object': [234, 153, 153],#
+            'sign': [246, 178, 107],#
+            'traffic_light': [250, 170, 30],#
+            'building': [70, 70, 70],#20
+            'road': [128, 64, 128],#
+            'lane_marker': [234, 209, 220],#
+            'road_marker': [217, 210, 233],#
+            'sidewalk': [244, 35, 232],#
+            'vegetation': [107, 142, 35],#25
+            'sky': [70, 130, 180],#
+            'ground': [102, 102, 102],#
+            'dynamic': [102, 102, 102],#
+            'static': [102, 102, 102]#
         }
 
         self.CLASSES = list(self.CLASSES_TO_PALLETTE.keys())
         self.PALLETE = list(self.CLASSES_TO_PALLETTE.values())
         self.color_map = np.array(self.PALLETE).astype(np.uint8)
-
+        
+       
+        self.create_mappings()
+        
+    def create_mappings(self):
+        # Convert a synthetic pallette which maps the
+        # object indices to the rgb colors
+        
+         # Useful for downstream synthesis
+        self.UNMAPPED_CLASSES = ['undefined', 'ego_vehicle', 'dynamic', 'static','ground',
+                                 'other_large_vehicle',   'trailer',
+                                 'pedestrian_object', 'cyclist', 
+                                 'motorcyclist', 'construction_cone_pole',
+                                 'lane_marker', 'road_marker' ]
+        # Useful for semantic mapping
+        self.ADE_CLASSES = {'pole':'pole', 
+                            'sidewalk':'sidewalk',
+                            'building':'building',
+                            'road':'road',
+                            'traffic_light': 'traffic light',
+                            'vegetation':'tree',
+                            'sign':'signboard',
+                            'sky':'sky',
+                            'ground_animal':'animal'
+                            }
+        
+        self.COCO_CLASSES = {'pedestrian':'person', 
+                             'bus': 'bus', 
+                             'truck': 'truck',
+                             'bicycle': 'bicycle',
+                             'car':'car',
+                             'motorcycle':'motorcycle', 
+                             'bird':'bird'
+                            }
+        
+        self.ADE_COLORS = {'pole': [51, 0, 255],
+                            'sidewalk': [235, 255, 7],
+                            'building': [180, 120, 120],
+                            'road': [140, 140, 140],
+                            'traffic light': [41, 0, 255],
+                            'tree': [4, 200, 3],
+                            'sky':[6, 230, 230],
+                            'signboard': [255, 5, 153],
+                            'animal': [255, 0, 122]
+                            }
+        
+        self.COCO_COLORS = {'person': [220, 20, 60],
+                            'bus': [0, 60, 100],
+                            'truck': [0, 0, 70],
+                            'bicycle': [119, 11, 32],
+                            'car': [0, 0, 142],
+                            'motorcycle': [0, 0, 230],
+                            'bird': [127, 96, 0]
+                            }
+        
+        self.CLASSES_TO_PALLETE_SYNTHETIC = {}
+        self.UNMAPPED_CLASS_IDX = []
+        for j, (key,color)  in enumerate(self.CLASSES_TO_PALLETTE.items()):
+            if key in self.UNMAPPED_CLASSES:
+                self.CLASSES_TO_PALLETE_SYNTHETIC[key] = color
+                self.UNMAPPED_CLASS_IDX.append(j)
+            elif key in self.ADE_CLASSES.keys():
+                self.CLASSES_TO_PALLETE_SYNTHETIC[key] = self.ADE_COLORS[self.ADE_CLASSES[key]]
+            elif key in self.COCO_CLASSES.keys():
+                self.CLASSES_TO_PALLETE_SYNTHETIC[key] = self.COCO_COLORS[self.COCO_CLASSES[key]]
+        
+        self.UNMAPPED_CLASS_IDX = np.array(self.UNMAPPED_CLASS_IDX)
+        self.color_map_synth = np.array(
+            list(self.CLASSES_TO_PALLETE_SYNTHETIC.values()))\
+                .astype(np.uint8)  
+        
     def __len__(self) -> int:
         # return max(len(self.camera_files), 
         #             len(self.segment_files), 
         #             len(self.instance_files))
-        return self.num_images
+        return self._num_images
 
+    @property
+    def METADATA(self):
+        return self._data_list
+    
     def get_text_description(self, object_mask: np.ndarray) -> str:
         '''
         Returns the text description of the object mask
@@ -326,6 +424,31 @@ class WaymoDataset(Dataset):
         semantic_mask = self.color_map[object_mask.squeeze()]
         return semantic_mask
 
+    def get_mapped_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
+        '''
+        Returns the semantic mask from the object mask mapped to the ADE20K classes
+        or COCO semantic classes
+
+        Args:
+            object_mask: The object mask to extract the semantic mask from
+        
+        Returns:
+            semantic_mask: The semantic mask of the object mask
+        '''
+        
+        # convert all the ade20k objects in the color mask to
+        semantic_mask = self.color_map_synth[object_mask.squeeze()]
+        return semantic_mask
+        
+    def get_unmapped_mask(self, object_mask: np.ndarray) -> np.ndarray:
+        '''
+        Returns a boolean mask whether the object mask category is mapped or not
+        '''
+        mask = np.zeros(object_mask.shape, dtype=np.bool)
+        for idx in self.UNMAPPED_CLASS_IDX:
+            mask = np.logical_or(mask, object_mask == idx)
+        return mask
+    
     def __getitem__(
             self, 
             index:int
@@ -358,100 +481,136 @@ class WaymoDataset(Dataset):
         
         # object_masks = self.get_object_class(semantic_masks)
 
-        if index >= self.num_images:
+        if index >= self._num_images:
             raise IndexError("Index out of range")
 
         # Find the appropriate index at which the image is stored
-
-        index_copy = index
-        cum_sum = 0
-        for k in self.segment_frames.keys():
-            if self.segmentation:
-                cum_sum += len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
-            else:
-                cum_sum += self.context_count[k]
-            if cum_sum>index:
-                context_name = k
-                if self.segmentation:
-                    len_context = self.context_count[k]
-                    assert len_context == len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES), \
-                    "Context count does not match the number of frames in the context"
-                    try:
-                        context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
-                                                            /len(self.ds_config.SAVE_FRAMES))]
-                    except:
-                        raise ValueError("The index is out of range")
-                    camera_id = self.ds_config.SAVE_FRAMES[(index - cum_sum + len_context\
-                                                        )%len(self.ds_config.SAVE_FRAMES)]
-                else:
-                    len_context = self.context_count[k]
-                    for (frame_id, camera_ids) in self.segment_frames[k]:
-                        if (index - cum_sum + len_context) < len(camera_ids):
-                            context_frame = frame_id
-                            camera_id = camera_ids[(index - cum_sum + len_context)] - 1
-                            break
-                        else:
-                            len_context -= len(camera_ids)
+        # DEPRECIATED:
+        # index_copy = index
+        # cum_sum = 0
+        # for k in self.segment_frames.keys():
+        #     if self.segmentation:
+        #         cum_sum += len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES)
+        #     else:
+        #         cum_sum += self.context_count[k]
+        #     if cum_sum>index:
+        #         context_name = k
+        #         if self.segmentation:
+        #             len_context = self.context_count[k]
+        #             assert len_context == len(self.segment_frames[k])*len(self.ds_config.SAVE_FRAMES), \
+        #             "Context count does not match the number of frames in the context"
+        #             try:
+        #                 context_frame = self.segment_frames[k][int((index - cum_sum + len_context)\
+        #                                                     /len(self.ds_config.SAVE_FRAMES))]
+        #             except:
+        #                 raise ValueError("The index is out of range")
+        #             camera_id = self.ds_config.SAVE_FRAMES[(index - cum_sum + len_context\
+        #                                                 )%len(self.ds_config.SAVE_FRAMES)]
+        #         else:
+        #             len_context = self.context_count[k]
+        #             for (frame_id, camera_ids) in self.segment_frames[k]:
+        #                 if (index - cum_sum + len_context) < len(camera_ids):
+        #                     context_frame = frame_id
+        #                     camera_id = camera_ids[(index - cum_sum + len_context)] - 1
+        #                     break
+        #                 else:
+        #                     len_context -= len(camera_ids)
                
-                break
+        #         break
         # Load all the frames from the context file
 
-        if self.segmentation:
-            frames_with_seg, camera_images = load_data_set_parquet(
-                config=self.ds_config, 
-                context_name=context_name, 
-                validation=self.validation,
-                context_frames=[context_frame]
-            )
-
-            semantic_labels_multiframe, \
-            instance_labels_multiframe, \
-            panoptic_labels = read_semantic_labels(
-                self.ds_config,
-                frames_with_seg
-            )
-            
-            camera_images_frame = read_camera_images(
-                self.ds_config,
-                camera_images
-            )
-
-            # All semantic labels are in the form of object indices defined by the PALLETE
-            camera_images = camera_images_frame[0][camera_id]
-            object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
-            instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
-
-            semantic_mask_rgb = self.get_semantic_mask(object_masks)
-            panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
-                                                                               instance_masks)
-        else:
-            boxes, camera_images = load_data_set_parquet(
-                config=self.ds_config, 
-                context_name=context_name, 
-                validation=self.validation,
-                context_frames=[context_frame],
-                segmentation=False
-            )
-
-            box_classes, bounding_boxes = read_box_labels(
-                self.ds_config,
-                boxes
-            )
-            
-            camera_images_frame = read_camera_images(
-                self.ds_config,
-                camera_images
-            )
-
-            camera_images = camera_images_frame[0][camera_id]
-            box_classes = box_classes[camera_id][0]
-            bounding_boxes = bounding_boxes[camera_id][0]
+        context_name = self._data_list[index]['context_name']
+        context_frame = self._data_list[index]['context_frame']
+        camera_id = self._data_list[index]['camera_id']
         
-        img_data = {
-            'context_name': context_name,
-            'context_frame': context_frame,
-            'camera_id': camera_id
-        }
+        with tf.device('cpu'):
+            if self.segmentation:
+                data = load_data_set_parquet(
+                    config=self.ds_config, 
+                    context_name=context_name, 
+                    validation=self.validation,
+                    context_frames=[context_frame],
+                    return_weather_cond=self.image_meta_data
+                )
+                if self.image_meta_data:
+                    frames_with_seg, camera_images, weather_list = data
+                else:
+                    frames_with_seg, camera_images = data
+
+                semantic_labels_multiframe, \
+                instance_labels_multiframe, \
+                panoptic_labels = read_semantic_labels(
+                    self.ds_config,
+                    frames_with_seg
+                )
+                
+                data = read_camera_images(
+                    self.ds_config,
+                    camera_images,
+                    return_weather_cond=self.image_meta_data,
+                    weather_conditions=weather_list
+                )
+
+                if self.image_meta_data:
+                    camera_images_frame, weather_labels_frame, lighting_conditions_frame = data
+                    weather = weather_labels_frame[0][camera_id]
+                    lighting_conditions = lighting_conditions_frame[0][camera_id]
+                    condition = weather + ', ' + lighting_conditions
+                else:
+                    camera_images_frame = data    
+                # All semantic labels are in the form of object indices defined by the PALLETE
+                camera_images = camera_images_frame[0][camera_id]
+                object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
+                instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
+
+                semantic_mask_rgb = self.get_semantic_mask(object_masks)
+                panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
+                                                                                instance_masks)
+            else:
+                boxes, camera_images = load_data_set_parquet(
+                    config=self.ds_config, 
+                    context_name=context_name, 
+                    validation=self.validation,
+                    context_frames=[context_frame],
+                    segmentation=False,
+                    return_weather_cond=self.image_meta_data
+                )
+                if self.image_meta_data:
+                    frames_with_seg, camera_images, weather_list = data
+                else:
+                    frames_with_seg, camera_images = data
+
+                box_classes, bounding_boxes = read_box_labels(
+                    self.ds_config,
+                    boxes
+                )
+                
+                camera_images_frame = read_camera_images(
+                    self.ds_config,
+                    camera_images,
+                    return_weather_cond=self.image_meta_data,
+                    weather_conditions=weather_list
+                )
+
+                if self.image_meta_data:
+                    camera_images_frame, weather_labels_frame, lighting_conditions_frame = data
+                    weather = weather_labels_frame[0][camera_id]
+                    lighting_conditions = lighting_conditions_frame[0][camera_id]
+                    condition = weather + ', ' + lighting_conditions
+                else:
+                    camera_images_frame = data  
+
+                camera_images = camera_images_frame[0][camera_id]
+                box_classes = box_classes[camera_id][0]
+                bounding_boxes = bounding_boxes[camera_id][0]
+        
+        if self.image_meta_data:
+            img_data = {
+                'context_name': context_name,
+                'context_frame': context_frame,
+                'camera_id': camera_id,
+                'condition': condition
+            }
 
         if self.segmentation:
             if self.image_meta_data:
@@ -495,7 +654,7 @@ def waymo_collate_fn(
 if __name__ == '__main__':
     config = omegaconf.OmegaConf.load('waymo_open_data/config.yaml')
     SEGMENTATION = True
-    IMAGE_META_DATA = False
+    IMAGE_META_DATA = True
     if config.SAVE_DATA:
         # Append the cwd to the paths in the config file
         # for keys in config.keys():

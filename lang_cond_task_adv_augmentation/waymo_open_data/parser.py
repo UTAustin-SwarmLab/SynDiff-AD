@@ -105,7 +105,8 @@ def load_data_set_parquet(
         context_name: str,
         validation=False,
         context_frames:List = None,
-        segmentation = True) -> Tuple[List[v2.CameraImageComponent], List[Any]]:
+        segmentation = True,
+        return_weather_cond = True) -> Tuple[List[v2.CameraImageComponent], List[Any]]:
     '''
     Load datset from parquet files for segmentation and camera images
     
@@ -119,7 +120,8 @@ def load_data_set_parquet(
 
     
     cam_images_df = read(config, 'camera_image', context_name, validation=validation)
-
+    stats_df = read(config, 'stats', context_name, validation=validation)
+    cam_images_df = v2.merge(cam_images_df, stats_df, right_group=True)
     if segmentation:
         cam_segmentation_df = read(config, 'camera_segmentation', 
                                    context_name,  
@@ -153,6 +155,7 @@ def load_data_set_parquet(
         
     cam_labels_list = []
     image_list = []
+    weather_list = []
     for i, (key_values, r) in enumerate(cam_labels_per_frame_df.iterrows()):
         # Read three sequences of 5 camera images for this demo.
         # Store a segmentation label component for each camera.
@@ -168,6 +171,9 @@ def load_data_set_parquet(
         image_list.append(
             [v2.CameraImageComponent.from_dict(d) 
             for d in ungroup_row(frame_keys, key_values, r)])
+        weather_list.append(
+            [v2.StatsComponent.from_dict(d) 
+             for d in ungroup_row(frame_keys, key_values, r)])
 
     # TODO: need to figure out what the function is to obtain camera images
     # for i, (key_values, r) in enumerate(cam_images_per_frame_df.iterrows()):
@@ -176,8 +182,11 @@ def load_data_set_parquet(
     #     cam_list.append(
     #         [v2.CameraSegmentationLabelComponent.from_dict(d) 
     #         for d in ungroup_row(frame_keys, key_values, r)])
-        
-    return cam_labels_list, image_list
+    
+    if return_weather_cond:
+        return cam_labels_list, image_list, weather_list
+    else:
+        return cam_labels_list, image_list
 
 
 def read_semantic_labels(
@@ -273,9 +282,32 @@ def read_box_labels(
 
     return box_classes_frame, bounding_boxes_frame
 
+def read_conditions(
+    config: omegaconf,
+    weather_conditions: List[v2.StatsComponent]
+    ) -> List:
+    '''
+    Read weather conditions from the dataset
+    '''
+    NUM_CAMERA_FRAMES = 5
+    weather_conditions_all = []
+    light_conditions_all = []
+    for i in range(0, len(weather_conditions)):
+        weather_conditions_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        lighting_conditions_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        for j in range(len(weather_conditions[i])):
+            cam_id = weather_conditions[i][j].key.camera_name - 1
+            weather_conditions_frame[cam_id] = weather_conditions[i][j].weather
+            lighting_conditions_frame[cam_id] = weather_conditions[i][j].time_of_day
+        weather_conditions_all.append(weather_conditions_frame)
+        light_conditions_all.append(lighting_conditions_frame)
+        
+    return weather_conditions_all, lighting_conditions_frame
 
 def read_camera_images(config: omegaconf, 
-                        camera_images: List[v2.CameraImageComponent]
+                        camera_images: List[v2.CameraImageComponent],
+                        weather_conditions: List[v2.StatsComponent] =None,
+                        return_weather_cond = True
                         ) -> List[np.ndarray]:
     '''
     Read camera images from the dataset
@@ -289,13 +321,26 @@ def read_camera_images(config: omegaconf,
     '''
     NUM_CAMERA_FRAMES = 5
     camera_images_all = []
-   
+    weather_conditions_all = []
+    light_conditions_all = []
+    
     for i in range(0, len(camera_images)):
         camera_images_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        weather_conditions_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+        lighting_conditions_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
         for j in range(len(camera_images[i])):
             cam_id = camera_images[i][j].key.camera_name - 1
             camera_images_frame[cam_id] = np.array(Image.open(
                 io.BytesIO(camera_images[i][j].image)))
+            weather_conditions_frame[cam_id] = weather_conditions[i][j].weather
+            lighting_conditions_frame[cam_id] = weather_conditions[i][j].time_of_day
+            
         camera_images_all.append(camera_images_frame)
+        weather_conditions_all.append(weather_conditions_frame)
+        light_conditions_all.append(lighting_conditions_frame)
+    
+    if return_weather_cond:
+        return camera_images_all, weather_conditions_all, light_conditions_all
+     
     return camera_images_all
 
