@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.getcwd(),'ControlNet/'))
 
 import ControlNet.config
 from ControlNet.cldm.hack import disable_verbosity, enable_sliced_attention
-
+from waymo_open_data import WaymoDataset
 
 disable_verbosity()
 
@@ -29,8 +29,8 @@ import random
 
 from pytorch_lightning import seed_everything
 from ControlNet.annotator.util import resize_image, HWC3
-from ControlNet.annotator.uniformer import UniformerDetector
-from ControlNet.annotator.oneformer import OneformerCOCODetector, OneformerADE20kDetector
+# from ControlNet.annotator.uniformer import UniformerDetector
+# from ControlNet.annotator.oneformer import OneformerCOCODetector, OneformerADE20kDetector
 from ControlNet.cldm.model import create_model, load_state_dict
 from ControlNet.cldm.ddim_hacked import DDIMSampler
 import pickle as pkl
@@ -39,7 +39,7 @@ import functools
 import matplotlib.pyplot as plt
 from typing import *
 from lang_data_synthesis.utils import convert_pallette_segment
-from ControlNet.annotator.uniformer.mmseg.datasets import ADE20KDataset
+# from ControlNet.annotator.uniformer.mmseg.datasets import ADE20KDataset
 from copy import copy
 
 def gradio_viz(
@@ -170,7 +170,29 @@ def get_ade20k(config):
     return img, seg_mask, object_keys
 
 
- 
+def get_waymo(config):
+    SEGMENTATION = True
+    IMAGE_META_DATA = True
+    VALIDATION = True
+    dataset = WaymoDataset(config.IMAGE.WAYMO, 
+                image_meta_data=IMAGE_META_DATA,
+                segmentation=SEGMENTATION,
+                        validation=VALIDATION)
+
+    # Obtain the image
+    np.random.seed(100)
+    idx = np.random.randint(0, len(dataset))
+    camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data = dataset[idx]
+    
+    # Obtain the segmentation mask
+    prompt_tokens = {}
+    prompt_tokens['a_prompt'] = "Must contain " + dataset.get_text_description(object_masks)
+    prompt_tokens['n_prompt'] = "Must not contain " + dataset.get_text_description(object_masks)
+    
+    semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
+    invalid_mask = dataset.get_unmapped_mask(object_masks)
+    return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask
+
 class ImageSynthesis:
     
     def __init__(self, config) -> None:
@@ -220,22 +242,22 @@ class ImageSynthesis:
         prompt_tokens : Dict of additional prompt tokens
         '''
 
-        if det == 'Seg_OFCOCO':
-            preprocessor = OneformerCOCODetector()
-        if det == 'Seg_OFADE20K':
-            preprocessor = OneformerADE20kDetector()
-        if det == 'Seg_UFADE20K':
-            preprocessor = UniformerDetector()
+        # if det == 'Seg_OFCOCO':
+        #     preprocessor = OneformerCOCODetector()
+        # if det == 'Seg_OFADE20K':
+        #     preprocessor = OneformerADE20kDetector()
+        # if det == 'Seg_UFADE20K':
+        #     preprocessor = UniformerDetector()
                             
         with torch.no_grad():
             input_image = HWC3(input_image)
             if seg_mask is None and det is None:
                 detected_map = input_image.copy()
             elif seg_mask is None:
-                detected_map = preprocessor(resize_image(input_image, detect_resolution))
+                # detected_map = preprocessor(resize_image(input_image, detect_resolution))
                 uniformer_segmap = detected_map.copy()
             else:
-                uniformer_segmap = preprocessor(resize_image(input_image, detect_resolution))
+                # uniformer_segmap = preprocessor(resize_image(input_image, detect_resolution))
                 detected_map = seg_mask[0].copy()
 
             img = resize_image(input_image, image_resolution)
@@ -288,9 +310,10 @@ class ImageSynthesis:
 
             results = [x_samples[i] for i in range(num_samples)]
             seg_results = []
-            for result in results:
-                seg_results.append(preprocessor(resize_image(result, detect_resolution)))
-        return [uniformer_segmap] + [detected_map] + results + seg_results
+            # for result in results:
+            #     seg_results.append(preprocessor(resize_image(result, detect_resolution)))
+        return [detected_map] + results
+        #return [uniformer_segmap] + [detected_map] + results #+ seg_results
         
     def run_model(
         self,
@@ -324,12 +347,53 @@ class ImageSynthesis:
                     num_samples, image_resolution, detect_resolution,
                     ddim_steps, guess_mode, strength, scale, seed, eta,
                     det=annotator, seg_mask=seg_mask, prompt_tokens=prompt_tokens)
+
+        return outputs
+
+def post_process(invalid_mask, syn_img, gt_img):
+    '''
+    Post processing function for the synthetic image
+    '''
+    syn_img = cv2.resize(syn_img, (gt_img.shape[1], gt_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+    syn_img[invalid_mask.squeeze()] = gt_img[invalid_mask.squeeze()]
+    return syn_img
+
+if __name__ == "__main__":
+    config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
+    synthesizer = ImageSynthesis(config)
+   
+    #img, seg_mask, object_keys = get_ade20k(config)
+    img, seg_mask, object_keys, mask = get_waymo(config)
+    if isinstance(object_keys, list):
+        prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
+        for key in object_keys:
+            if key != '-':
+                prompt_tokens['a_prompt'] += 'same {}, '.format(key)
+                prompt_tokens['n_prompt'] += 'missing {}, '.format(key)
+    else:
+        prompt_tokens = object_keys
         
+    if config.GRADIO:
+        gradio_viz(title='control net test', 
+                synthesizer=synthesizer,
+                input_image=img.copy(), seg_mask = [seg_mask.copy()], 
+                server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090,
+                prompt_tokens=prompt_tokens)
+    else:
+        prompt = 'Rainy weather condition during nightime'
+        outputs = synthesizer.run_model(img.copy(), 
+                              seg_mask=[seg_mask.copy()],
+                              prompt = prompt,
+                              prompt_tokens=prompt_tokens)
+                
+        results = outputs[1:]
+        for j,syn_img in enumerate(results):
+            outputs[j+1] = post_process(mask, syn_img, img)
         save_path = os.path.join(os.getcwd(), config.SAVE.PATH)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         plt.figure(figsize=(10, 10))
-        plt.imshow(input_image)
+        plt.imshow(img)
         plt.savefig(os.path.join(save_path, 'input.png'))
         plt.close()
         for i, output in enumerate(outputs):
@@ -337,32 +401,6 @@ class ImageSynthesis:
             plt.imshow(output)
             plt.savefig(os.path.join(save_path, 'output_{}.png'.format(i+1)))
             plt.close()
-
-
-
-if __name__ == "__main__":
-    config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
-    synthesizer = ImageSynthesis(config)
-    img, seg_mask, object_keys = get_ade20k(config)
-
-    prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
-    for key in object_keys:
-        if key != '-':
-            prompt_tokens['a_prompt'] += 'same {}, '.format(key)
-            prompt_tokens['n_prompt'] += 'missing {}, '.format(key)
-
-    if config.GRADIO:
-        gradio_viz(title='contorl net test', 
-                synthesizer=synthesizer,
-                input_image=img.copy(), seg_mask = [seg_mask.copy()], 
-                server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090,
-                prompt_tokens=prompt_tokens)
-    else:
-        prompt = 'Night'
-        synthesizer.run_model(img.copy(), 
-                              seg_mask=[seg_mask.copy()],
-                              prompt = prompt,
-                              prompt_tokens=prompt_tokens)
                               
 # TODO: Modularization of this function is pending
 # DESIGN_DICT =  [{'type': 'image', 
