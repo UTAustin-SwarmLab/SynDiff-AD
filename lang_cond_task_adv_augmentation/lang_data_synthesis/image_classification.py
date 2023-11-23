@@ -27,7 +27,6 @@ import tensorflow as tf
 # from waymo_open_data_parser.data_loader import dataloader
 import open_clip
 from lang_data_synthesis.utils import write_to_csv_from_dict
-
 from copy import deepcopy
 class CLIPClassifier:
     def __init__(self, 
@@ -78,7 +77,7 @@ class CLIPClassifier:
             "context_name":"content_name",
             "context_frame":"context_frame",
             "camera_id":"camera_id",
-            "image_index":"image_index",
+            # "image_index":"image_index",
             "condition":"condition"
         }
         write_to_csv_from_dict(
@@ -141,18 +140,27 @@ class CLIPClassifier:
         
         # Load from dataloader
         image_indices = 0
-        for j, outputs in tqdm(enumerate(self.dataloader)):
+        for j, outputs in tqdm(enumerate(self.dataloader), total=len(self.dataloader)):
             camera_images = outputs[0]
+            condition = []
+            time = None
             if self.dataset.image_meta_data:
                 image_data = outputs[4]
-
+                condition = [img_data['condition'] for img_data in image_data]
+                time = [cond.split(",")[1] for cond in condition]
             # condition = self.classify_image(torch.tensor(camera_images,
             #                                           dtype=torch.float32
             #                                         ).unsqueeze(0))  
-            condition = self.classify_image(camera_images.numpy())        
+            condition_class = self.classify_image(camera_images.numpy())  
+            condition = [] 
+            if time is not None:
+                for t, cond in zip(time, condition_class):
+                    cond = cond + "," + t
+                    condition.append(cond)
+            
             # Add to df
             for idx in range(image_indices,image_indices+len(image_data)):
-                image_data[idx - image_indices]['index'] = idx
+                # image_data[idx - image_indices]['index'] = idx
                 image_data[idx - image_indices]['condition'] = condition[idx - image_indices]
                 write_to_csv_from_dict(
                     dict_data = image_data[idx - image_indices], 
@@ -167,7 +175,7 @@ if __name__=="__main__":
     config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
     SEGMENTATION = True
     IMAGE_META_DATA = True
-    VALIDATION = True
+    VALIDATION = False
     tf.config.set_visible_devices([], 'GPU')
     if VALIDATION:
         FILENAME = "waymo_open_data/waymo_env_conditions_val.csv"
