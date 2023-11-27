@@ -89,6 +89,8 @@ def gradio_viz(
                                                  minimum=256, maximum=1024, value=512, step=64)
                     strength = gr.Slider(label="Control Strength", minimum=0.0,
                                           maximum=2.0, value=1.0, step=0.01)
+                    init_noise = gr.Slider(label="Initialisation Noise", minimum=0.0,
+                                          maximum=1.0, value=0.2, step=0.01)
                     guess_mode = gr.Checkbox(label='Guess Mode', value=False)
                     apply_image_cond = gr.Checkbox(label='Apply Image Condition', value=False)
                     detect_resolution = gr.Slider(label="Segmentation Resolution", 
@@ -108,7 +110,7 @@ def gradio_viz(
                 result_gallery = gr.Gallery(label='Output', show_label=False, elem_id="gallery").style(grid=2, height='auto')
         ips = [input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, 
                detect_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, det,
-               apply_image_cond]
+               apply_image_cond, init_noise]
         run_button.click(fn=functools.partial(synthesizer.process,
                                                 seg_mask=seg_mask, prompt_tokens=prompt_tokens),
                             inputs=ips, outputs=[result_gallery])
@@ -236,8 +238,10 @@ class ImageSynthesis:
         eta,
         det,
         apply_image_cond=False,
+        init_noise=0.2,
         seg_mask=None,
-        prompt_tokens=None):
+        prompt_tokens=None,
+        ):
         '''
         prompt_tokens : Dict of additional prompt tokens
         '''
@@ -262,7 +266,6 @@ class ImageSynthesis:
 
             img = resize_image(input_image, image_resolution)
             H, W, C = img.shape
-
             
             detected_map = cv2.resize(detected_map, (W, H), interpolation=cv2.INTER_NEAREST)
 
@@ -296,9 +299,16 @@ class ImageSynthesis:
 
             self.model.control_scales = [strength * (0.825 ** float(12 - i)) \
                                     for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
+            
+            img_cond = torch.tensor(img).float().cuda().permute((2,0,1)) / 255.0
+            encoder_posterior = self.model.encode_first_stage(img_cond.unsqueeze(0).repeat(num_samples, 1, 1, 1))            
+            z = self.model.get_first_stage_encoding(encoder_posterior).detach()
+            x_T = init_noise*torch.randn_like(z) + z * (1 - init_noise)
+            
             samples, intermediates = self.ddim_sampler.sample(ddim_steps, num_samples,
                                                         shape, cond, verbose=False, eta=eta,
                                                         unconditional_guidance_scale=scale,
+                                                        x_T=x_T,
                                                         unconditional_conditioning=un_cond)
 
             if ControlNet.config.save_memory:
@@ -327,7 +337,7 @@ class ImageSynthesis:
             raise ValueError("Please provide the input image")
         
         if prompt is None:
-            prompt = 'night'
+            prompt = 'Rainy weather condition during nightime'
         
         # Obtain from config
         a_prompt = self.config.SYNTHESIS_PARAMS.A_PROMPT
@@ -341,12 +351,14 @@ class ImageSynthesis:
         eta = self.config.SYNTHESIS_PARAMS.ETA
         num_samples = self.config.SYNTHESIS_PARAMS.NUMSAMPLES
         strength = self.config.SYNTHESIS_PARAMS.CONTROL
+        init_noise = self.config.SYNTHESIS_PARAMS.INIT_NOISE
         annotator = 'Seg_OFADE20K'
 
         outputs = self.process(input_image, prompt, a_prompt, n_prompt,
                     num_samples, image_resolution, detect_resolution,
                     ddim_steps, guess_mode, strength, scale, seed, eta,
-                    det=annotator, seg_mask=seg_mask, prompt_tokens=prompt_tokens)
+                    init_noise=init_noise, det=annotator,
+                    seg_mask=seg_mask, prompt_tokens=prompt_tokens)
 
         return outputs
 
