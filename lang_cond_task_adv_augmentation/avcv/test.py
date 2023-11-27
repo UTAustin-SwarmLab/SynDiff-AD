@@ -32,7 +32,11 @@ class ConditionAVTester:
     
         self.test_config = test_config
         
-        model_config_path = test_config.model_config_path + test_config.model_name + '.py'
+        if 'synth' in test_config.model_name or 'mixed' in test_config.model_name:
+            model_config_path = test_config.model_config_path + test_config.source_model + '.py'
+        else:
+            model_config_path = test_config.model_config_path + test_config.model_name + '.py'
+            
         cfg = Config.fromfile(model_config_path)
         print(f'Config:\n{cfg.pretty_text}')
         cfg.work_dir = test_config.work_dir + test_config.model_name + args.dir_tag
@@ -55,6 +59,7 @@ class ConditionAVTester:
                 cfg.optim_wrapper.loss_scale = 'dynamic'
 
         # Loads Checkpoint
+
         loads = cfg.work_dir 
         latest_path = 0
         latest_iter = 0
@@ -65,11 +70,13 @@ class ConditionAVTester:
                 if iter>latest_iter:
                     latest_iter = iter
                     latest_path = i
+        
+        cfg.resume = True
         cfg.load_from = osp.join(loads, latest_path)
 
         # TODO: Load the dataset stuff
 
-        FILENAME = self.test_config.waymo_data_path + "waymo_conditions_val.csv"
+        FILENAME = self.test_config.waymo_data_path + "waymo_env_conditions_val.csv"
 
         if os.path.exists(FILENAME):
             self.metadata_conditions = pd.read_csv(FILENAME)
@@ -79,17 +86,21 @@ class ConditionAVTester:
                 .groupby(['condition']).size() / self.dataset_length * 100)
             
         self.engine = Runner.from_cfg(cfg)
+        self.engine.load_or_resume()
         self.cfg = cfg
         
         data_dict = {
-            "context_name":"content_name",
+            "context_name":"context_name",
             "context_frame":"context_frame",
             "camera_id":"camera_id",
             "condition":"condition"
         }
         for metric in self.engine.test_evaluator.metrics:
-            data_dict[metric.metrics[0]+'_metric'] = metric.metrics[0]+'_metric'
-            data_dict[metric.metrics[0]+'_perclass'] = metric.metrics[0]+'_perclass'
+            data_dict[metric.metrics[0]+'_intersect'] = metric.metrics[0]+'_intersect'
+            data_dict[metric.metrics[0]+'_union'] = metric.metrics[0]+'_union'
+            data_dict[metric.metrics[0]+'_pred_label'] = metric.metrics[0]+'_pred_label'
+            data_dict[metric.metrics[0]+'_label'] = metric.metrics[0]+'_label'
+
             
         self.save_filename = test_config.test_data_path  + test_config.model_name + ".csv"
         write_to_csv_from_dict(
@@ -111,81 +122,94 @@ class ConditionAVTester:
         evaluator = self.engine.test_evaluator
         self.engine.model.eval()
         
-        for idx, data_batch in enumerate(tqdm(dataloader, desc='val', total=len(dataloader))):
-            # Lets resolve the tester here
-            
-            with autocast(enabled=self.engine.val_loop.fp16):
-                outputs = self.engine.model.val_step(data_batch)
+        with torch.no_grad():
+            for idx, data_batch in enumerate(tqdm(dataloader, desc='val', total=len(dataloader))):
+                # Lets resolve the tester here
                 
-            evaluator.process(data_samples=outputs, 
-                              data_batch=data_batch)
-            
-            
-            # Obtain the condition from the dataset
-            for j,sample in enumerate(data_batch['data_samples']):
-                context_name = sample.context_name
-                context_frame = sample.context_frame
-                camera_id = sample.camera_id
+                with autocast(enabled=self.engine.val_loop.fp16):
+                    outputs = self.engine.model.val_step(data_batch)
+                    
+                evaluator.process(data_samples=outputs, 
+                                data_batch=data_batch)
                 
-                condition = self.metadata_conditions.loc[(self.metadata_conditions['context_name'] == context_name) & \
-                    (self.metadata_conditions['context_frame'] == context_frame) & \
-                    (self.metadata_conditions['camera_id'] == camera_id)].condition.values[0]
                 
-                data_dict = {
-                    'context_name':context_name,
-                    'context_frame':context_frame,
-                    'camera_id':camera_id,
-                    'image_index':condition,  
-                }
-                
+                # Obtain the condition from the dataset
+                for j,sample in enumerate(data_batch['data_samples']):
+                    context_name = sample.context_name
+                    context_frame = sample.context_frame
+                    camera_id = sample.camera_id
+                    
+                    condition = self.metadata_conditions.loc[(self.metadata_conditions['context_name'] == context_name) & \
+                        (self.metadata_conditions['context_frame'] == context_frame) & \
+                        (self.metadata_conditions['camera_id'] == camera_id)].condition.values[0]
+                    
+                    # weather = condition.split(',')[-1]
+                    # condition = sample.condition
+                    # time = condition.split(',')[-1]
+                    # condition = weather + ',' + time
+                    
+                    data_dict = {
+                        'context_name':context_name,
+                        'context_frame':context_frame,
+                        'camera_id':camera_id,
+                        'condition':condition 
+                    }
+                    
+                    for metric in evaluator.metrics:
+                        results = [[to_numpy(a) for a in metric.results[j]]]
+                        results  = tuple(zip(*results))
+                        total_area_intersect = sum(results[0])
+                        total_area_union = sum(results[1])
+                        total_area_pred_label = sum(results[2])
+                        total_area_label = sum(results[3])
+
+                        data_dict[metric.metrics[0]+'_intersect'] = total_area_intersect
+                        data_dict[metric.metrics[0]+'_union'] = total_area_union
+                        data_dict[metric.metrics[0]+'_pred_label'] = total_area_pred_label
+                        data_dict[metric.metrics[0]+'_label'] = total_area_label
+                        
+                        # ret_metrics = metric.total_area_to_metrics(
+                        #     total_area_intersect, total_area_union, total_area_pred_label,
+                        #     total_area_label, metric.metrics,
+                        #     metric.nan_to_num, metric.beta)
+                        
+                        # class_names = metric.dataset_meta['classes']
+
+                        # # summary table
+                        # ret_metrics_summary = OrderedDict({
+                        #     ret_metric: np.round(np.nanmean(ret_metric_value) * 100, 2)
+                        #     for ret_metric, ret_metric_value in ret_metrics.items()
+                        # })
+                        
+                        # metrics = dict()
+                        # for key, val in ret_metrics_summary.items():
+                        #     if key == 'aAcc':
+                        #         metrics[key] = val
+                        #     else:
+                        #         metrics['m' + key] = val
+
+                        # # each class table
+                        # ret_metrics.pop('aAcc', None)
+                        # ret_metrics_class = OrderedDict({
+                        #     ret_metric: np.round(ret_metric_value * 100, 2)
+                        #     for ret_metric, ret_metric_value in ret_metrics.items()
+                        # })
+                        # ret_metrics_class.update({'Class': class_names})
+                        # ret_metrics_class.move_to_end('Class', last=False)
+                        
+                        # data_dict[metric.metrics[0]+'_metric'] = metrics
+                        # data_dict[metric.metrics[0]+'_perclass'] = dict(ret_metrics_class)
+                    
+                    write_to_csv_from_dict(
+                        dict_data=data_dict , 
+                        csv_file_path= self.save_filename,
+                        file_name=""
+                    )
                 for metric in evaluator.metrics:
-                    results = [[to_cpu(a) for a in metric.results[j]]]
-                    results  = tuple(zip(*results))
-                    total_area_intersect = sum(results[0])
-                    total_area_union = sum(results[1])
-                    total_area_pred_label = sum(results[2])
-                    total_area_label = sum(results[3])
+                    metric.results.clear()
+                torch.cuda.empty_cache()
 
-                    
-                    ret_metrics = metric.total_area_to_metrics(
-                        total_area_intersect, total_area_union, total_area_pred_label,
-                        total_area_label, metric.metrics,
-                        metric.nan_to_num, metric.beta)
-                    
-                    class_names = metric.dataset_meta['classes']
-
-                    # summary table
-                    ret_metrics_summary = OrderedDict({
-                        ret_metric: np.round(np.nanmean(ret_metric_value) * 100, 2)
-                        for ret_metric, ret_metric_value in ret_metrics.items()
-                    })
-                    
-                    metrics = dict()
-                    for key, val in ret_metrics_summary.items():
-                        if key == 'aAcc':
-                            metrics[key] = val
-                        else:
-                            metrics['m' + key] = val
-
-                    # each class table
-                    ret_metrics.pop('aAcc', None)
-                    ret_metrics_class = OrderedDict({
-                        ret_metric: np.round(ret_metric_value * 100, 2)
-                        for ret_metric, ret_metric_value in ret_metrics.items()
-                    })
-                    ret_metrics_class.update({'Class': class_names})
-                    ret_metrics_class.move_to_end('Class', last=False)
-                    
-                    data_dict[metric.metrics[0]+'_metric'] = metrics
-                    data_dict[metric.metrics[0]+'_perclass'] = dict(ret_metrics_class)
-                
-                write_to_csv_from_dict(
-                    dict_data=data_dict , 
-                    csv_file_path= self.save_filename,
-                    file_name=""
-                )
-
-        return metrics
+        return None
     
 def parse_args():
     parser = ArgumentParser(description='Train a segmentor')
