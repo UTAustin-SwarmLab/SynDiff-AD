@@ -390,7 +390,7 @@ class WaymoDatasetMM(BaseSegDataset):
         context_frame = data_info['context_frame']
         camera_id = data_info['camera_id']
         
-        camera_labels, camera_images = self.load_data_set_parquet(
+        camera_labels, camera_images, camera_weather, camera_lighting = self.load_data_set_parquet(
                 context_name=context_name, 
                 validation=self.validation,
                 context_frames=[context_frame]
@@ -415,13 +415,16 @@ class WaymoDatasetMM(BaseSegDataset):
             camera_images = camera_images[0][camera_id]
             box_classes = box_classes[camera_id][0]
             bounding_boxes = bounding_boxes[camera_id][0]
-        
+        weather = camera_weather[0][camera_id]
+        lighting_conditions = camera_lighting[0][camera_id]
+        condition = weather + ', ' + lighting_conditions
         if self.segmentation:
             data_info['img'] = camera_images
             data_info['gt_seg_map'] = object_masks
             data_info['gt_instance_map'] = instance_masks
             data_info['gt_object_map'] = semantic_mask_rgb
             data_info['ori_shape'] = camera_images.shape[:2]
+            data_info['condition'] = condition
             return data_info
         
         else:
@@ -429,6 +432,7 @@ class WaymoDatasetMM(BaseSegDataset):
             data_info['gt_bboxes'] = bounding_boxes
             data_info['gt_labels'] = box_classes
             data_info['ori_shape'] = camera_images.shape[:2]
+            data_info['condition'] = condition
             return data_info
  
     
@@ -528,7 +532,8 @@ class WaymoDatasetMM(BaseSegDataset):
 
     
         cam_images_df = read(self.waymo_config, 'camera_image', context_name, validation=validation)
-
+        stats_df = read(self.waymo_config, 'stats', context_name, validation=validation)
+        cam_images_df = v2.merge(cam_images_df, stats_df, right_group=True)
         if self.segmentation:
             cam_segmentation_df = read(self.waymo_config, 'camera_segmentation', 
                                     context_name,  
@@ -562,6 +567,7 @@ class WaymoDatasetMM(BaseSegDataset):
             
         cam_labels_list = []
         image_list = []
+        weather_list = []
         for i, (key_values, r) in enumerate(cam_labels_per_frame_df.iterrows()):
             # Read three sequences of 5 camera images for this demo.
             # Store a segmentation label component for each camera.
@@ -577,10 +583,14 @@ class WaymoDatasetMM(BaseSegDataset):
             image_list.append(
                 [v2.CameraImageComponent.from_dict(d) 
                 for d in ungroup_row(frame_keys, key_values, r)])
+            
+            weather_list.append(
+            [v2.StatsComponent.from_dict(d) 
+             for d in ungroup_row(frame_keys, key_values, r)])
         
         parsed_cam_labels = self.read_labels(cam_labels_list)
-        parsed_cam_images = self.read_camera_images(image_list)
-        return parsed_cam_labels, parsed_cam_images
+        parsed_cam_images, parsed_weather, parsed_lightning = self.read_camera_images(image_list, weather_list)
+        return parsed_cam_labels, parsed_cam_images, parsed_weather, parsed_lightning
     
     def read_labels(
         self, 
@@ -646,8 +656,10 @@ class WaymoDatasetMM(BaseSegDataset):
 
             return box_classes_frame, bounding_boxes_frame   
     
-    def read_camera_images(self,
-                        camera_images: List[v2.CameraImageComponent]
+    def read_camera_images(self, 
+                        camera_images: List[v2.CameraImageComponent],
+                        weather_conditions: List[v2.StatsComponent] =None,
+                        return_weather_cond = True
                         ) -> List[np.ndarray]:
         '''
         Read camera images from the dataset
@@ -661,15 +673,27 @@ class WaymoDatasetMM(BaseSegDataset):
         '''
         NUM_CAMERA_FRAMES = 5
         camera_images_all = []
-    
+        weather_conditions_all = []
+        light_conditions_all = []
+        
         for i in range(0, len(camera_images)):
             camera_images_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+            weather_conditions_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
+            lighting_conditions_frame = [[] for _ in range(NUM_CAMERA_FRAMES)]
             for j in range(len(camera_images[i])):
                 cam_id = camera_images[i][j].key.camera_name - 1
                 camera_images_frame[cam_id] = np.array(Image.open(
                     io.BytesIO(camera_images[i][j].image)))
+                weather_conditions_frame[cam_id] = weather_conditions[i][j].weather
+                lighting_conditions_frame[cam_id] = weather_conditions[i][j].time_of_day
+                
             camera_images_all.append(camera_images_frame)
+            weather_conditions_all.append(weather_conditions_frame)
+            light_conditions_all.append(lighting_conditions_frame)
+        if return_weather_cond:
+            return camera_images_all, weather_conditions_all, light_conditions_all
+     
         return camera_images_all
-    
+
 if __name__ == '__main__':
     raise NotImplementedError
