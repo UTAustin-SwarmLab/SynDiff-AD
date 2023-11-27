@@ -58,7 +58,16 @@ class SyntheticAVGenerator:
         else:
             raise Exception("File not found")
         
-        self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"metadata.csv")
+        if self.config.SYN_DATASET_GEN.segmentation:
+            self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                              "metadata_seg.csv")
+            self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                       "filenames_seg.txt")
+        else:
+            self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                              "metadata_det.csv")
+            self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                       "filenames_det.txt")
         dict_data = {'filename':'filename', 'condition':'condition'}
         write_to_csv_from_dict(
             dict_data = dict_data, 
@@ -82,12 +91,12 @@ class SyntheticAVGenerator:
         object_masks, img_data = self.dataset[source_idx]
         prompt_tokens = {}
         prompt_tokens['a_prompt'] = "Must contain " + self.dataset.get_text_description(object_masks)
-        prompt_tokens['n_prompt'] = "Must not contain " + self.dataset.get_text_description(object_masks)
-    
+        #prompt_tokens['n_prompt'] = "Must not contain " + self.dataset.get_text_description(object_masks)
+        prompt_tokens['n_prompt'] = ""
         semantic_mapped_rgb_mask = self.dataset.get_mapped_semantic_mask(object_masks)
         invalid_mask = self.dataset.get_unmapped_mask(object_masks)
         weather, day = target_condition.split(',')
-        prompt = ' A photorealistic camera image taken during {} weather conditions during {} time'.format(weather, day)
+        prompt = ' A camera image taken during {} weather conditions during {} time'.format(weather, day)
         with torch.no_grad():
             outputs = self.synthesizer.run_model(camera_images.copy(), 
                                 seg_mask=[semantic_mapped_rgb_mask.copy()],
@@ -163,8 +172,7 @@ class SyntheticAVGenerator:
                 #     f.write(file_name+","+target_condition+"\n")
                     
                 # Write the filename in a txt file
-                with open(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                       "filenames.txt"), 'a') as f:
+                with open(self.txtfilename, 'a') as f:
                     f.write(file_name+"\n")                
                 
             
