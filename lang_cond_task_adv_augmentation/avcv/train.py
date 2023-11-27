@@ -6,6 +6,8 @@ import os.path as osp
 import numpy as np
 
 from avcv.dataset.dataset_wrapper import WaymoDatasetMM, AVResize
+from avcv.dataset.synth_dataset_wrapper import SynthWaymoDatasetMM
+from avcv.dataset.mixed_dataset_wrapper import MixedWaymoDatasetMM
 from mmengine import Config
 from mmengine.runner import Runner
 from omegaconf import OmegaConf
@@ -48,6 +50,8 @@ class AVTrain:
         # resume training
         cfg.resume = args.resume
 
+        # For fine-tuning 
+
         # Load the pretrained weights
         if args.resume:
             loads = cfg.work_dir 
@@ -64,6 +68,19 @@ class AVTrain:
             
         else:
             cfg.load_from = train_config.load_model_paths 
+        
+        if 'synth' in train_config.model_name or 'mixed' in train_config.model_name:
+            loads = train_config.work_dir + train_config.source_model + args.dir_tag
+            latest_path = 0
+            latest_iter = 0
+            for i in os.listdir(loads):
+                if i.endswith('.pth'):
+                    #find iter number
+                    iter = int(i.split('.')[0].split('_')[-1])
+                    if iter>latest_iter:
+                        latest_iter = iter
+                        latest_path = i
+            cfg.load_from = osp.join(loads, latest_path)
 
         # Set up working dir to save files and logs.
         cfg.train_cfg.max_iters = train_config.max_iters
@@ -99,12 +116,12 @@ def parse_args():
         help='job launcher')
     parser.add_argument(
         '--config_name',
-        default='mask2former_r50_8xb2-90k_waymo-512x512',
+        default='mask2former_r50_8xb2-90k_mixedwaymo-512x512',
         help='train config in configs/train_configs/'
     )
     parser.add_argument(
         '--dir_tag',
-        default='',
+        default='v1',
         help='tag for new directory to save model'
     )
     
