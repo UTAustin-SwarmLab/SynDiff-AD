@@ -32,17 +32,18 @@ SAVE:
   PATH: 'lang_data_synthesis/test_results/'
 SYNTHESIS_PARAMS:
   CONTROL : 1.0
-  NUMSAMPLES : 3
+  NUMSAMPLES : 2
   GUESS : True
-  DETECT_RESOLUTION : 512
+  DETECT_RESOLUTION : 1024
   IMAGE_RESOLUTION: 512
-  DDIMSTEPS : 30
+  DDIMSTEPS : 60
   SCALE: 9.0
   SEED: 2000
   ETA: 0.00
+  INIT_NOISE: 1.0
   ANNOTATOR: 'Seg_OFADE20K'
-  A_PROMPT: 'picture is taken from a camera, detailed, same textures'
-  N_PROMPT: 'disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality'
+  A_PROMPT: 'camera like photo, realistic textures, HD quality'
+  N_PROMPT: 'unrealistic, very sharp, disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality'
 LLAVACAPTION:
     MODELPATH: 'liuhaotian/llava-llama-2-13b-chat-lightning-preview'
     MODELBASE: None
@@ -63,8 +64,8 @@ ROBUSTIFICATION:
     'An image taken by a camera during {} weather conditions.'                                      ]
   batch_size: 8
 SYN_DATASET_GEN:
-  target_prob_soft: 0.005
-  num_synthetic_images: 1000
+  target_prob_soft: 0.001
+  num_synthetic_images: 2500
   dataset_path: '/store/harsh/data/waymo_synthetic/'
   segmentation: True
   conditions_path: 'waymo_open_data/'
