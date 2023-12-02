@@ -9,7 +9,7 @@ from LLaVA.llava.conversation import conv_templates, SeparatorStyle
 from LLaVA.llava.model.builder import load_pretrained_model
 from LLaVA.llava.utils import disable_torch_init
 from LLaVA.llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
-
+from lang_data_synthesis.utils import write_to_csv_from_dict
 from PIL import Image
 
 import requests
@@ -22,7 +22,9 @@ from waymo_open_data import WaymoDataset, waymo_collate_fn
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-
+import functools
+import torch.utils.data.dataloader as DataLoader
+import tensorflow as tf
 class LLaVACaption:
     '''
     Class to generate captions for the Waymo Open Dataset
@@ -31,7 +33,33 @@ class LLaVACaption:
     def __init__(self, config:omegaconf, dataset:WaymoDataset):
         self.config = config
         self.dataset:WaymoDataset = dataset
-
+    
+        FILENAME = self.config.LLAVACAPTION.conditions_path + "waymo_env_conditions_train.csv"
+        self.conditions_metadata = pd.read_csv(FILENAME)
+        
+        data_dict = {
+            "context_name":"content_name",
+            "context_frame":"context_frame",
+            "camera_id":"camera_id",
+            # "image_index":"image_index",
+            "caption":"caption"
+        }
+        write_to_csv_from_dict(
+                    dict_data=data_dict , 
+                    csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train.csv",
+                    file_name=""
+                )
+        
+        collate_fn = functools.partial(
+                waymo_collate_fn, 
+                segmentation=self.dataset.segmentation,
+                image_meta_data=self.dataset.image_meta_data
+            )
+        self.dataloader = DataLoader.DataLoader(self.dataset,
+                                            batch_size=self.config.LLAVACAPTION.batch_size,
+                                            shuffle=False,
+                                            collate_fn=collate_fn,
+                                            num_workers=self.config.LLAVACAPTION.batch_size)
     def load_image(self,
                 index,
                 batch_size: int = 1):
@@ -61,11 +89,15 @@ class LLaVACaption:
             prompt: str,
             index: int,
             query: str,
-            conv_mode: str):
+            conv_mode: str,
+            image=None,
+            prompt_objects=None,
+            image_data=None):
 
-        image, prompt_objects, image_data = self.load_image(
-            index
-        )
+        if image is None or prompt_objects is None or image_data is None:
+            image, prompt_objects, image_data = self.load_image(
+                index
+            )
         qs = query.format(prompt_objects)
 
         if model.config.mm_use_im_start_end:
@@ -74,7 +106,6 @@ class LLaVACaption:
             qs = DEFAULT_IMAGE_TOKEN + '\n' + qs
         
         
-
         conv = conv_templates[conv_mode].copy()
         conv.append_message(conv.roles[0], qs)
         conv.append_message(conv.roles[1], None)
@@ -127,7 +158,9 @@ class LLaVACaption:
         tokenizer, model, image_processor, context_len \
             = load_pretrained_model(self.config.LLAVACAPTION.MODELPATH, 
                                     self.config.LLAVACAPTION.MODELBASE,
-                                    model_name)
+                                    model_name,
+                                    load_8bit=self.config.LLAVACAPTION.load_8bit,
+                                    load_4bit=self.config.LLAVACAPTION.load_4bit,)
 
         if 'llama-2' in model_name.lower():
             conv_mode = "llava_llama_2"
@@ -155,25 +188,66 @@ class LLaVACaption:
         elif type(self.config.LLAVACAPTION.NUM_IMAGES) == str:
             raise ValueError('NUM_IMAGES must be an integer or "ALL"')
 
-        for j in tqdm(range(self.config.LLAVACAPTION.NUM_IMAGES)):
-            caption, image_data = self.get_caption(model, 
-                                model_name, 
-                                image_processor, 
-                                tokenizer, 
-                                self.config.LLAVACAPTION.prompt, 
-                                j, 
-                                self.config.LLAVACAPTION.prompt, 
-                                self.config.LLAVACAPTION.conv_mode)
-            keys = list(image_data.keys())
-            values = list(image_data.values())
-            column_names.append(tuple(keys + ['caption']))
-            captions.append([tuple(values + [caption])])
-        column_names = set(column_names)
-        captions_df = pd.DataFrame(captions, columns=list(column_names))
-        return captions_df
+        with torch.no_grad():
+            for j, outputs in tqdm(enumerate(self.dataloader), total=len(self.dataloader)):
+            #for j in tqdm(range(self.config.LLAVACAPTION.NUM_IMAGES)):
+                camera_images = outputs[0]
+                object_masks = outputs[3]
+                image_data_batch = outputs[4]
+                
+                for j in range(len(camera_images)):
+                    image = camera_images[j]
+                    object_mask = object_masks[j]
+                    image_data = image_data_batch[j]
+                    prompt_tokens = self.dataset.get_text_description(object_mask)
+                    caption, _ = self.get_caption(model, 
+                                        model_name, 
+                                        image_processor, 
+                                        tokenizer, 
+                                        self.config.LLAVACAPTION.prompt, 
+                                        j, 
+                                        self.config.LLAVACAPTION.prompt, 
+                                        self.config.LLAVACAPTION.conv_mode,
+                                        image=image,
+                                        prompt_objects=prompt_tokens,
+                                        image_data=image_data)
+                    # keys = list(image_data.keys())
+                    # values = list(image_data.values())
+                    # column_names.append(tuple(keys + ['caption']))
+                    # Modify the condition
+                    
+                    condition_data = self.conditions_metadata.loc[
+                        (self.conditions_metadata['context_frame'] == image_data['context_frame']) &
+                        (self.conditions_metadata['context_name'] == image_data['context_name']) &
+                        (self.conditions_metadata['camera_id'] == image_data['camera_id'])
+                    ]['condition'].values.tolist()[0]
+                    
+                    image_data['condition'] = condition_data
+                    weather = image_data['condition'].split(",")[0]
+                    time = image_data['condition'].split(",")[1]
+                    caption = " This image is taken during {} time of the day and features {} weather. ".format(time, weather) + caption
+                    
+                    data_dict = {
+                        "context_name":image_data['context_name'],
+                        "context_frame":image_data['context_frame'],
+                        "camera_id":image_data['camera_id'],
+                        # "image_index":image_data['image_index'],
+                        "caption":caption
+                    }
+                    
+                    write_to_csv_from_dict(
+                            dict_data = data_dict, 
+                            csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train.csv",
+                            file_name=""
+                    )
+            # captions.append([tuple(values + [caption])])
+        # column_names = set(column_names)
+        # captions_df = pd.DataFrame(captions, columns=list(column_names))
+        # return captions_df
 
 if __name__ == "__main__":
     config = omegaconf.OmegaConf.load("lang_data_synthesis/config.yaml")
+    tf.config.set_visible_devices([], 'GPU')
     dataset = WaymoDataset(config.IMAGE.WAYMO, image_meta_data=True)
     captioner = LLaVACaption(config, dataset=dataset)
     captions = captioner.caption_dataset()
