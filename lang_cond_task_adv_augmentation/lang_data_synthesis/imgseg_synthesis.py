@@ -19,7 +19,6 @@ if ControlNet.config.save_memory:
 
 
 import omegaconf
-
 import cv2
 import einops
 import gradio as gr
@@ -182,7 +181,7 @@ def get_waymo(config):
                         validation=VALIDATION)
 
     # Obtain the image
-    np.random.seed(100)
+    np.random.seed(100000)
     idx = np.random.randint(0, len(dataset))
     camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data = dataset[idx]
     

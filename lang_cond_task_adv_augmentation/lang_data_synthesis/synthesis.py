@@ -35,10 +35,10 @@ class SyntheticAVGenerator:
             os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"img"))
             os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"mask"))
             
-        FILENAME = self.config.SYN_DATASET_GEN.conditions_path + "waymo_env_conditions_val.csv"
-
-        if os.path.exists(FILENAME):
-            self.metadata_conditions = pd.read_csv(FILENAME)
+        VAL_FILENAME = self.config.SYN_DATASET_GEN.conditions_path + "waymo_env_conditions_val.csv"
+        
+        if os.path.exists(VAL_FILENAME):
+            self.metadata_conditions = pd.read_csv(VAL_FILENAME)
             print(self.metadata_conditions.columns)
             self.dataset_length = len(self.metadata_conditions)
             print(self.metadata_conditions\
@@ -57,6 +57,17 @@ class SyntheticAVGenerator:
             self.conditions = list(self.source_probability.keys())
         else:
             raise Exception("File not found")
+        
+        # Replace meta data conditions with those in the training dataset
+        TRAIN_FILENAME = self.config.SYN_DATASET_GEN.conditions_path + "waymo_env_conditions_train.csv"
+        if os.path.exists(TRAIN_FILENAME) and not self.dataset.validation:
+            self.metadata_conditions = pd.read_csv(TRAIN_FILENAME)
+            print(self.metadata_conditions.columns)
+            self.dataset_length = len(self.metadata_conditions)
+            print(self.metadata_conditions\
+                .groupby(['condition']).size() / self.dataset_length * 100)
+        
+            self.grouped_df = self.metadata_conditions.groupby(['condition'])
         
         if self.config.SYN_DATASET_GEN.segmentation:
             self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
