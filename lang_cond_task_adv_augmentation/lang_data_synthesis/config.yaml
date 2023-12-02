@@ -45,13 +45,16 @@ SYNTHESIS_PARAMS:
   A_PROMPT: 'camera like photo, realistic textures, HD quality'
   N_PROMPT: 'unrealistic, very sharp, disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality'
 LLAVACAPTION:
-    MODELPATH: 'liuhaotian/llava-llama-2-13b-chat-lightning-preview'
+    MODELPATH: 'liuhaotian/llava-v1.5-13b'
     MODELBASE: None
     NUM_IMAGES: 'ALL' # 'ALL' or int
-    prompt: 'Caption the image in terms of the lighting conditions and weather. Produce additional
-    captions on the objects {} and their relationships.'
-    conv_mode: 'llava_llama_2'
-    BATCH_SIZE: 1
+    prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), lighting conditions and image quality. Don't mention the weather conditions or daytime."
+    conv_mode: 'llava_v1'
+    batch_size: 16
+    load_8bit: False
+    load_4bit: True
+    num_workers: 4
+    conditions_path: 'waymo_open_data/'
 ROBUSTIFICATION:       
   test_conditions : [
     # ["Day", "Night"],
@@ -61,7 +64,8 @@ ROBUSTIFICATION:
   classify: True
   prompt_add: [
     #'An image taken by a camera during {} time.',
-    'An image taken by a camera during {} weather conditions.'                                      ]
+    'An image taken by a camera during {} weather conditions.'
+    ]
   batch_size: 8
 SYN_DATASET_GEN:
   target_prob_soft: 0.001
