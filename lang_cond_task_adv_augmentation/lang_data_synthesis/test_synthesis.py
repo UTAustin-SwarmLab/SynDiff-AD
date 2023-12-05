@@ -16,6 +16,8 @@ from mmseg.registry import DATASETS, TRANSFORMS
 from avcv.dataset.dataset_wrapper import *
 from avcv.dataset.synth_dataset_wrapper import SynthWaymoDatasetMM
 from mmengine.registry import init_default_scope
+from mmseg.models.data_preprocessor import SegDataPreProcessor
+from tqdm import tqdm
 init_default_scope('mmseg')
 
 def _compute_fid(mu1: Tensor,
@@ -169,6 +171,16 @@ class FID_Metric(Metric):
         """Return number of samples used to compute FID both fake and real"""
         return self.real_features_num_samples, self.fake_features_num_samples
 
+def collate_fn(batch):
+    keys = batch[0].keys()
+    collated_batch = {}
+    for key in keys:
+        if key == 'inputs':
+            collated_batch[key] = torch.stack([sample[key] for sample in batch])
+        else:
+            collated_batch[key] = [sample[key] for sample in batch]
+    return collated_batch
+
 class EvaluateSynthesisFID:
 
     def __init__(self,
@@ -178,6 +190,17 @@ class EvaluateSynthesisFID:
 
         # Create the datasets for both the fake data and real data
         self.config = config
+        
+        self.data_preprocessor = SegDataPreProcessor(
+            mean=[123.675, 116.28, 103.53],
+            std=[58.395, 57.12, 57.375],
+            bgr_to_rgb=False,
+            pad_val=0,
+            seg_pad_val=255,
+            size=[512,512],
+            test_cfg=dict(size_divisor=32)
+        )
+        
         self.real_data = WaymoDatasetMM(
             data_config=dict(
                 TRAIN_DIR = self.config.IMAGE.WAYMO.TRAIN_DIR , 
@@ -204,7 +227,8 @@ class EvaluateSynthesisFID:
             batch_size=16,
             num_workers=16,
             persistent_workers=True,
-            shuffle=False
+            shuffle=False,
+            collate_fn=collate_fn
         )
         # Create per_class FID metrics and full dataset FID metric
         self.fake_data = SynthWaymoDatasetMM(
@@ -228,7 +252,8 @@ class EvaluateSynthesisFID:
             batch_size=16,
             num_workers=16,
             persistent_workers=True,
-            shuffle=False
+            shuffle=False,
+            collate_fn=collate_fn
         )
         # Initialize feature extraction backbone RESNET 50 and the data preprocessor
         
@@ -243,67 +268,86 @@ class EvaluateSynthesisFID:
         
         FAKE_FILENAME = self.config.SYN_DATASET_GEN.dataset_path + "/metadata_seg.csv"
         if os.path.exists(FAKE_FILENAME):
-            self.fake_metadata_conditions = pd.read_csv(TRAIN_FILENAME)
+            self.fake_metadata_conditions = pd.read_csv(FAKE_FILENAME)
             
         # Load the environment conditions of the real data
         for condition in self.conditions:
-            self.fid_dict[condition] = FID_Metric(num_features=2048)
-        self.final_fid = FID_Metric(num_features=2048)
+            self.fid_dict[condition] = FID_Metric(num_features=1000)
+        self.final_fid = FID_Metric(num_features=1000)
     
     
     def __call__(self, *args: Any, **kwds: Any) -> Any:
-        
+    
         with torch.no_grad():
-            for j in range(0, len(self.real_data)):
-                
-                data = self.real_data[j]
+            for j,data in tqdm(enumerate(self.real_data_loader), total=len(self.real_data_loader)):
+                # if j>=20:
+                #     break
+                data = self.data_preprocessor(data)
+                #data = self.real_data[j]
                 images = data['inputs']
-                meta_data = data['data_samples'].metainfo
+                data_samples = data['data_samples']
                 # Extract features from the real data
+                
                 real_features = self.feature_extractor(images)
                 
-                condition = self.metadata_conditions.loc[
-                    (self.metadata_conditions['context_name'] == meta_data['context_name']) & 
-                    (self.metadata_conditions['context_frame'] == meta_data['context_frame']) & 
-                    (self.metadata_conditions['camera_id'] == meta_data['camera_id']) 
-                ]['condition'].values[0]
-                # Update the FID metric with the features
-                self.fid_dict[condition].update(real_features, real=True)
+                for i in range(0, len(data_samples)):
+                    meta_data = data_samples[i].metainfo
+                    condition = self.real_metadata_conditions.loc[
+                        (self.real_metadata_conditions['context_name'] == meta_data['context_name']) & 
+                        (self.real_metadata_conditions['context_frame'] == meta_data['context_frame']) & 
+                        (self.real_metadata_conditions['camera_id'] == meta_data['camera_id']) 
+                    ]['condition'].values[0]
+                    # Update the FID metric with the features
+                    self.fid_dict[condition].update(real_features[[i]], real=True)
                 self.final_fid.update(real_features, real=True)
             
-            for j in range(0, len(self.fake_data)):
-                data = self.fake_data[j]
-                images = data['img']
-                meta_data = data['img_meta_data']
+            for j,data in tqdm(enumerate(self.fake_data_loader), total=len(self.fake_data_loader)):
+                # if j>=20:
+                #     break
+                #data = self.fake_data[j]
+                data = self.data_preprocessor(data)
+                images = data['inputs']
+                data_samples = data['data_samples']
                 # Extract features from the real data
+               
                 fake_features = self.feature_extractor(images)
-                
-                condition = self.fake_metadata_conditions.loc[
-                    (self.fake_metadata_conditions['file_name'] == meta_data['file_name']) 
-                ]['condition'].values[0]
+                for i in range(0, len(data_samples)):
+                    meta_data = data_samples[i].metainfo
+                    condition = self.fake_metadata_conditions.loc[
+                        (self.fake_metadata_conditions['filename'] == meta_data['file_name']) 
+                    ]['condition'].values[0]
                 # Update the FID metric with the features
-                self.fid_dict[condition].update(fake_features, real=False)
+                    self.fid_dict[condition].update(fake_features[[i]], real=False)
                 self.final_fid.update(fake_features, real=False)
             
             # Now compute the FID score for each condition 
             # and the total FID score over all conditions
             fid_scores = {}
             for condition in self.conditions:
-                fid_scores[condition] = self.fid_dict[condition].compute()
+                try:
+                    fid_scores[condition] = self.fid_dict[condition].compute().item()
+                except:
+                    fid_scores[condition] = -1.0
             
             # Compute the total FID score
-            fid_scores['total'] = self.final_fid.compute()
+            fid_scores['total'] = self.final_fid.compute().item()
             
             # Save the FID scores to a json file
-            path = self.config.SYN_DATASET_GEN.results_path +\
-            self.config.SYN_DATASET_GEN.dataset_path.split('/')[-1]+".json"
+            path = self.config.SYN_DATASET_GEN.fid_results_path +\
+            self.config.SYN_DATASET_GEN.dataset_path.split('/')[-2]+".json"
             
-            json.dump(fid_scores, open(self.config.SYN_DATASET_GEN.dataset_path + "/fid_scores.json", 'w'))
+            json.dump(fid_scores, open(path, 'w'))
             
             
 if __name__ == "__main__":
     config = omegaconf.OmegaConf.load("lang_data_synthesis/config.yaml")
-    evaluate_fid = EvaluateSynthesisFID(config)
-    evaluate_fid()
+    
+    if torch.cuda.is_available():
+        with torch.cuda.device(0):
+            evaluate_fid = EvaluateSynthesisFID(config)
+            evaluate_fid()
+    else:
+        evaluate_fid = EvaluateSynthesisFID(config)
+        evaluate_fid()
             
             
