@@ -1,4 +1,4 @@
-name: control-v11
+name: control-v11.8
 channels:
   - pytorch
   - defaults
@@ -8,7 +8,7 @@ dependencies:
   - pip=20.3
   - cudatoolkit
   - pytorch
-  - pytorch-cuda
+  - pytorch-cuda==11.8
   - torchvision
   - numpy
   - pip:
@@ -51,5 +51,6 @@ dependencies:
       - einops==0.6.1
       - einops-exts==0.0.4
       - gradio_client==0.5.1
-      - numpy==1.23.1
+      - numpy==1.21.5
       - ipdb==0.13.13
+      - git+https://github.com/openai/CLIP.git

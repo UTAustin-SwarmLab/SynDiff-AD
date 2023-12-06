@@ -4,8 +4,6 @@ This is a template repository. Please initialize your python project using this 
 
 1. Please set pythonpath during execution to the lang_cond_task_adv_augmentation folder in the repo before executing scripts see 8.
 
-2. `your_project_name` is your project package name including src.
-
 3. Development
    ```
    conda env create -n control-v11.8 -f environment.yml
@@ -44,12 +42,20 @@ Scripts not mentioned here are Work in Progress
 
 a - image_classification.py - classifies the images as per test conditions specified in lang_data_synthesis/config.yaml
 
-b - image_prompting.py - captioning images using LLAVA-1.1 -LLAVA-1.5 upgrade pending
+b - image_prompting.py - captioning images using LLAVA-1.5 upgrade pending
 
 c - imgseg_synthesis.py - single image conditional synthesis using controlnet
 
 d - utils.py - utility functions
 
+e - synthesis.py - synthesizes a dataset using controlnet and the target conditions
+
+f - test_synthesis.py - tests the synthesised dataset to produce FID scores with respect to different backbones
+
+10. Since the model weights have not been pushed, the results file are available
+  -  avcv/tests comprises all the results for finetuning
+  -  Run the results.ipynb script in avcv/experiments to view the compiled results
+  - Since the synthetic dataset needs to be produced, checkout the .json files under lang_data_synthesis/synthesis_results for FID scores
 
 
 
