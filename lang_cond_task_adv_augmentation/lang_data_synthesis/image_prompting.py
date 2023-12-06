@@ -2,6 +2,7 @@ import argparse
 import torch
 import sys
 import os
+from typing import *
 
 sys.path.append(os.path.join(os.getcwd(),'LLaVA/'))
 from LLaVA.llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
@@ -25,6 +26,10 @@ import numpy as np
 import functools
 import torch.utils.data.dataloader as DataLoader
 import tensorflow as tf
+
+import multiprocessing
+from multiprocessing import Process, Queue
+
 class LLaVACaption:
     '''
     Class to generate captions for the Waymo Open Dataset
@@ -36,20 +41,27 @@ class LLaVACaption:
     
         FILENAME = self.config.LLAVACAPTION.conditions_path + "waymo_env_conditions_train.csv"
         self.conditions_metadata = pd.read_csv(FILENAME)
-        
         data_dict = {
-            "context_name":"content_name",
-            "context_frame":"context_frame",
-            "camera_id":"camera_id",
-            # "image_index":"image_index",
-            "caption":"caption"
-        }
-        write_to_csv_from_dict(
-                    dict_data=data_dict , 
-                    csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train.csv",
-                    file_name=""
-                )
-        
+                    "context_name":"content_name",
+                    "context_frame":"context_frame",
+                    "camera_id":"camera_id",
+                    # "image_index":"image_index",
+                    "caption":"caption"
+                }
+        if config.LLAVACAPTION.num_workers > 0:
+            for j in range(self.config.LLAVACAPTION.num_workers):
+                write_to_csv_from_dict(
+                            dict_data=data_dict , 
+                            csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train{}.csv".format(j),
+                            file_name=""
+                        )
+        else:
+             write_to_csv_from_dict(
+                        dict_data=data_dict , 
+                        csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train.csv",
+                        file_name=""
+                        )
+            
         collate_fn = functools.partial(
                 waymo_collate_fn, 
                 segmentation=self.dataset.segmentation,
@@ -81,7 +93,9 @@ class LLaVACaption:
 
             return images, prompt_tokens_list, image_data_list
 
-    def get_caption(self,
+   
+    @staticmethod   
+    def get_caption(
             model: torch.nn.Module,
             model_name: str,
             image_processor: torch.nn.Module,
@@ -94,10 +108,10 @@ class LLaVACaption:
             prompt_objects=None,
             image_data=None):
 
-        if image is None or prompt_objects is None or image_data is None:
-            image, prompt_objects, image_data = self.load_image(
-                index
-            )
+        # if image is None or prompt_objects is None or image_data is None:
+        #     image, prompt_objects, image_data = self.load_image(
+        #         index
+        #     )
         qs = query.format(prompt_objects)
 
         if model.config.mm_use_im_start_end:
@@ -147,7 +161,91 @@ class LLaVACaption:
         
         return outputs, image_data
 
+    @staticmethod
+    def worker_process(queue, 
+                       model_path, 
+                       model_base,
+                       load_8bit, 
+                       load_4bit,
+                       gpu_id,
+                       worker_id,
+                       conditions_metadata,
+                       get_text_description:Callable,
+                       get_caption:Callable,
+                       ):
+        """
+        Worker process that fetches a batch from the queue, processes it, and returns the result.
+        """
+        # Set the GPU for this worker
+        torch.cuda.set_device(gpu_id)
 
+        # Load the model in the worker
+        disable_torch_init()
+        model_name = get_model_name_from_path(model_path)
+        tokenizer, model, image_processor, _ = load_pretrained_model(
+            model_path, model_base, get_model_name_from_path(model_path),
+            load_8bit=load_8bit, load_4bit=load_4bit,
+        )
+
+        while True:
+            batch, config = queue.get()
+            if batch is None:  # Poison pill means shutdown
+                break
+
+            with torch.no_grad():
+
+            #for j in tqdm(range(self.config.LLAVACAPTION.NUM_IMAGES)):
+                camera_images = batch[0]
+                object_masks = batch[3]
+                image_data_batch = batch[4]
+                
+                for j in range(len(camera_images)):
+                    image = camera_images[j]
+                    object_mask = object_masks[j]
+                    image_data = image_data_batch[j]
+                    prompt_tokens = get_text_description(object_mask)
+                    caption, _ = get_caption(model, 
+                                        model_name, 
+                                        image_processor, 
+                                        tokenizer, 
+                                        config.LLAVACAPTION.prompt, 
+                                        j, 
+                                        config.LLAVACAPTION.prompt, 
+                                        config.LLAVACAPTION.conv_mode,
+                                        image=image,
+                                        prompt_objects=prompt_tokens,
+                                        image_data=image_data)
+                    # keys = list(image_data.keys())
+                    # values = list(image_data.values())
+                    # column_names.append(tuple(keys + ['caption']))
+                    # Modify the condition
+                    
+                    condition_data = conditions_metadata.loc[
+                        (conditions_metadata['context_frame'] == image_data['context_frame']) &
+                        (conditions_metadata['context_name'] == image_data['context_name']) &
+                        (conditions_metadata['camera_id'] == image_data['camera_id'])
+                    ]['condition'].values.tolist()[0]
+                    
+                    image_data['condition'] = condition_data
+                    weather = image_data['condition'].split(",")[0]
+                    time = image_data['condition'].split(",")[1]
+                    caption = " This image is taken during {} time of the day and features {} weather. ".format(time, weather) + caption
+                    
+                    data_dict = {
+                        "context_name":image_data['context_name'],
+                        "context_frame":image_data['context_frame'],
+                        "camera_id":image_data['camera_id'],
+                        # "image_index":image_data['image_index'],
+                        "caption":caption
+                    }
+                    
+                    write_to_csv_from_dict(
+                            dict_data=data_dict , 
+                            csv_file_path= config.LLAVACAPTION.conditions_path + "waymo_captions_train{}.csv".format(worker_id),
+                            file_name=""
+                        )
+            #result_queue.put(True)
+            
     def caption_dataset(self):
         # Model
         disable_torch_init()
@@ -244,17 +342,88 @@ class LLaVACaption:
         # column_names = set(column_names)
         # captions_df = pd.DataFrame(captions, columns=list(column_names))
         # return captions_df
+    def caption_dataset_parallel(self, num_workers=4):
+        """
+        Function to caption the dataset using multiple processes with a model loaded in each.
+        """
+        # Create queues for data and results
+        queue = Queue(maxsize=num_workers*3)
+        # result_queue = Queue(maxsize=num_workers*3)
+        if self.config.LLAVACAPTION.MODELBASE =='None':
+            self.config.LLAVACAPTION.MODELBASE = None
+        
+        model_name = get_model_name_from_path(self.config.LLAVACAPTION.MODELPATH)
+        if 'llama-2' in model_name.lower():
+            conv_mode = "llava_llama_2"
+        elif "v1" in model_name.lower():
+            conv_mode = "llava_v1"
+        elif "mpt" in model_name.lower():
+            conv_mode = "mpt"
+        else:
+            conv_mode = "llava_v0"
+
+        if self.config.LLAVACAPTION.conv_mode is not None \
+            and conv_mode != self.config.LLAVACAPTION.conv_mode:
+            print('[WARNING] the auto inferred conversation mode is\
+                {}, while `--conv-mode` is {}, using {}'.format(conv_mode, 
+                                                        self.config.LLAVACAPTION.conv_mode, 
+                                                        self.config.LLAVACAPTION.conv_mode))
+        else:
+            self.config.LLAVACAPTION.conv_mode = conv_mode
+        
+        get_text_description = functools.partial(WaymoDataset.get_text_description, 
+                                                 CLASSES=self.dataset.CLASSES)
+        # Start worker processes
+        workers = [Process(target=LLaVACaption.worker_process, 
+                           args=(queue,
+                                 self.config.LLAVACAPTION.MODELPATH,
+                                 self.config.LLAVACAPTION.MODELBASE,
+                                 self.config.LLAVACAPTION.load_8bit,
+                                 self.config.LLAVACAPTION.load_4bit,
+                                 i % self.config.LLAVACAPTION.model_per_gpu,
+                                 i,
+                                 self.conditions_metadata,
+                                 get_text_description,
+                                 LLaVACaption.get_caption
+                                 ))
+                   for i in range(num_workers)]
+
+        for w in workers:
+            w.start()
+
+        # Feed batches to the queue
+        for j, batch in tqdm(enumerate(self.dataloader), total=len(self.dataloader)):
+            queue.put((batch,self.config))
+
+        # Add poison pills to stop the workers
+        for _ in range(num_workers):
+            queue.put((None,None))
+
+        # Collect results
+        # all_captions = []
+        # for _ in range(len(self.dataloader)):
+        #     all_captions.extend(result_queue.get())
+
+        # Wait for all worker processes to finish
+        for w in workers:
+            w.join()
+
+        # return all_captions
 
 if __name__ == "__main__":
     config = omegaconf.OmegaConf.load("lang_data_synthesis/config.yaml")
     tf.config.set_visible_devices([], 'GPU')
     dataset = WaymoDataset(config.IMAGE.WAYMO, image_meta_data=True)
     captioner = LLaVACaption(config, dataset=dataset)
-    captions = captioner.caption_dataset()
+    if config.LLAVACAPTION.num_workers > 0:
+        multiprocessing.set_start_method('spawn', force=True)
+        captions = captioner.caption_dataset_parallel(config.LLAVACAPTION.num_workers)
+    else:
+        captions = captioner.caption_dataset()
 
     # Create a parquet file that stores captions of all the images in the dataset
     prompt_folder = "../waymo_data/training/"
 
     # save captions 
-    print('Writing Captions')
-    captions.to_csv(os.path.join(prompt_folder,'waymo_captions.csv'), index=False)
+    # print('Writing Captions')
+    # captions.to_csv(os.path.join(prompt_folder,'waymo_captions.csv'), index=False)

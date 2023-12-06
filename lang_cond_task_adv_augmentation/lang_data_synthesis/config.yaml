@@ -36,7 +36,7 @@ SYNTHESIS_PARAMS:
   GUESS : True
   DETECT_RESOLUTION : 1024
   IMAGE_RESOLUTION: 512
-  DDIMSTEPS : 60
+  DDIMSTEPS : 30
   SCALE: 9.0
   SEED: 2000
   ETA: 0.00
@@ -53,8 +53,9 @@ LLAVACAPTION:
     batch_size: 16
     load_8bit: False
     load_4bit: True
-    num_workers: 4
+    num_workers: 6
     conditions_path: 'waymo_open_data/'
+    model_per_gpu: 2
 ROBUSTIFICATION:       
   test_conditions : [
     # ["Day", "Night"],
@@ -70,6 +71,10 @@ ROBUSTIFICATION:
 SYN_DATASET_GEN:
   target_prob_soft: 0.001
   num_synthetic_images: 2500
-  dataset_path: '/store/harsh/data/waymo_synthetic/'
+  dataset_path: '/store/harsh/data/waymo_synthetic_llava/' # waymo_syntheitc_llava if use_llava_prompt is True
   segmentation: True
   conditions_path: 'waymo_open_data/'
+  use_llava_prompt: True
+  llava_prompt_path: 'waymo_open_data/'
+  fid_results_path: 'lang_data_synthesis/synthesis_results/'
+  fid_test_model: 'R50' # Swin-T or R50
