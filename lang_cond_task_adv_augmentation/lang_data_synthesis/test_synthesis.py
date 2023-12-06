@@ -6,19 +6,35 @@ from torch import Tensor
 from copy import deepcopy
 import torch
 
+from mmengine import Config
 
 from torchvision.models import resnet50
 import os
 import json
 import pandas as pd
 import omegaconf
-from mmseg.registry import DATASETS, TRANSFORMS
+from mmseg.registry import DATASETS, TRANSFORMS, MODELS
 from avcv.dataset.dataset_wrapper import *
 from avcv.dataset.synth_dataset_wrapper import SynthWaymoDatasetMM
 from mmengine.registry import init_default_scope
 from mmseg.models.data_preprocessor import SegDataPreProcessor
 from tqdm import tqdm
+from mmengine.runner.checkpoint import _load_checkpoint, _load_checkpoint_to_model
 init_default_scope('mmseg')
+
+def load_checkpoint(    model,
+                        filename: str,
+                        map_location: Union[str, Callable] = 'cpu',
+                        strict: bool = False,
+                        revise_keys: list = [(r'^module.', '')]):
+
+        checkpoint = _load_checkpoint(filename, map_location=map_location)
+
+        # Add comments to describe the usage of `after_load_ckpt`
+        checkpoint = _load_checkpoint_to_model(
+            model, checkpoint, strict, revise_keys=revise_keys)
+
+        return checkpoint
 
 def _compute_fid(mu1: Tensor,
                 sigma1: Tensor, 
@@ -191,15 +207,15 @@ class EvaluateSynthesisFID:
         # Create the datasets for both the fake data and real data
         self.config = config
         
-        self.data_preprocessor = SegDataPreProcessor(
-            mean=[123.675, 116.28, 103.53],
-            std=[58.395, 57.12, 57.375],
-            bgr_to_rgb=False,
-            pad_val=0,
-            seg_pad_val=255,
-            size=[512,512],
-            test_cfg=dict(size_divisor=32)
-        )
+        # self.data_preprocessor = SegDataPreProcessor(
+        #     mean=[123.675, 116.28, 103.53],
+        #     std=[58.395, 57.12, 57.375],
+        #     bgr_to_rgb=False,
+        #     pad_val=0,
+        #     seg_pad_val=255,
+        #     size=[512,512],
+        #     test_cfg=dict(size_divisor=32)
+        # )
         
         self.real_data = WaymoDatasetMM(
             data_config=dict(
@@ -257,7 +273,23 @@ class EvaluateSynthesisFID:
         )
         # Initialize feature extraction backbone RESNET 50 and the data preprocessor
         
-        self.feature_extractor = resnet50(weights='DEFAULT')
+        # Load the models and the feature extractors
+        if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
+            model_config = Config.fromfile('lang_data_synthesis/synthesis_results/swin_t_model.py')
+            
+            model = MODELS.build(model_config.model).cuda()
+            load_checkpoint(model, 'lang_data_synthesis/synthesis_results/swin-t.pth')
+            self.num_features = model.backbone.num_features[-1]
+            # model.load_state_dict(torch.load('lang_data_synthesis/synthesis_results/swin-t.pth'))
+        elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
+            model_config = Config.fromfile('lang_data_synthesis/synthesis_results/r_50_model.py')
+            model = MODELS.build(model_config.model).cuda()
+            load_checkpoint(model, 'lang_data_synthesis/synthesis_results/r50.pth')
+            #model.load_state_dict(torch.load('lang_data_synthesis/synthesis_results/r50.pth'))    
+            self.num_features = model.backbone.feat_dim
+            
+        self.feature_extractor = model.backbone
+        self.data_preprocessor = model.data_preprocessor
         
         # Initialize per class FID metrics
         self.fid_dict = {}
@@ -272,8 +304,8 @@ class EvaluateSynthesisFID:
             
         # Load the environment conditions of the real data
         for condition in self.conditions:
-            self.fid_dict[condition] = FID_Metric(num_features=1000)
-        self.final_fid = FID_Metric(num_features=1000)
+            self.fid_dict[condition] = FID_Metric(num_features=self.num_features)
+        self.final_fid = FID_Metric(num_features=self.num_features)
     
     
     def __call__(self, *args: Any, **kwds: Any) -> Any:
@@ -289,7 +321,12 @@ class EvaluateSynthesisFID:
                 # Extract features from the real data
                 
                 real_features = self.feature_extractor(images)
-                
+                N, C, H, W = real_features[-1].shape
+                if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
+                    real_features = real_features[-1].reshape(N, C, H*W).mean(dim=-1)
+                elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
+                    real_features = real_features[-1].reshape(N, C, H*W).max(dim=-1)
+                real_features = real_features.cpu()
                 for i in range(0, len(data_samples)):
                     meta_data = data_samples[i].metainfo
                     condition = self.real_metadata_conditions.loc[
@@ -311,6 +348,12 @@ class EvaluateSynthesisFID:
                 # Extract features from the real data
                
                 fake_features = self.feature_extractor(images)
+                N, C, H, W = fake_features[-1].shape
+                if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
+                    fake_features = fake_features[-1].reshape(N, C, H*W).mean(dim=-1)
+                elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
+                    fake_features = fake_features[-1].reshape(N, C, H*W).max(dim=-1)
+                fake_features = fake_features.cpu()
                 for i in range(0, len(data_samples)):
                     meta_data = data_samples[i].metainfo
                     condition = self.fake_metadata_conditions.loc[
@@ -334,7 +377,8 @@ class EvaluateSynthesisFID:
             
             # Save the FID scores to a json file
             path = self.config.SYN_DATASET_GEN.fid_results_path +\
-            self.config.SYN_DATASET_GEN.dataset_path.split('/')[-2]+".json"
+            self.config.SYN_DATASET_GEN.dataset_path.split('/')[-2]+\
+            "_"+self.config.SYN_DATASET_GEN.fid_test_model + ".json"
             
             json.dump(fid_scores, open(path, 'w'))
             
