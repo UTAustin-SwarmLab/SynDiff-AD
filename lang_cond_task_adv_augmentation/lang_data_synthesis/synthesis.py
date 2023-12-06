@@ -85,8 +85,14 @@ class SyntheticAVGenerator:
             csv_file_path=self.metadata_path, 
             file_name=""
         )
+        self.prompt_df = None
+        if self.config.SYN_DATASET_GEN.use_llava_prompt:
+            self.llavafilename = os.path.join(self.config.SYN_DATASET_GEN.llava_prompt_path,
+                                       "waymo_captions_train.csv")
+            self.prompt_df = pd.read_csv(self.llavafilename)
+
         # Load the model for synthesis
-        config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
+   
         self.synthesizer = ImageSynthesis(config)
     
     def sample_source_image(self, source_condition):  
@@ -101,13 +107,26 @@ class SyntheticAVGenerator:
         camera_images, _, _,\
         object_masks, img_data = self.dataset[source_idx]
         prompt_tokens = {}
-        prompt_tokens['a_prompt'] = "Must contain " + self.dataset.get_text_description(object_masks)
+        prompt_tokens['a_prompt'] = "Must contain " + WaymoDataset.get_text_description(object_masks, self.dataset.CLASSES)
         #prompt_tokens['n_prompt'] = "Must not contain " + self.dataset.get_text_description(object_masks)
         prompt_tokens['n_prompt'] = ""
         semantic_mapped_rgb_mask = self.dataset.get_mapped_semantic_mask(object_masks)
         invalid_mask = self.dataset.get_unmapped_mask(object_masks)
         weather, day = target_condition.split(',')
-        prompt = ' A camera image taken during {} weather conditions during {} time'.format(weather, day)
+        if self.config.SYN_DATASET_GEN.use_llava_prompt:
+            prompt = self.prompt_df.loc[
+                (img_data['context_name'] == self.prompt_df['context_name']) &
+                (img_data['context_frame'] == self.prompt_df['context_frame']) &
+                (img_data['camera_id'] == self.prompt_df['camera_id'])
+            ]['caption'].values[0]
+            source_condition = self.metadata_conditions.iloc[source_idx]['condition']
+            source_weather, source_day = source_condition.split(',')
+            
+            prompt = prompt.replace(source_weather, weather)
+            prompt = prompt.replace(source_day, day)
+            
+        else:
+            prompt = ' A camera image taken during {} weather conditions during {} time'.format(weather, day)
         with torch.no_grad():
             outputs = self.synthesizer.run_model(camera_images.copy(), 
                                 seg_mask=[semantic_mapped_rgb_mask.copy()],
