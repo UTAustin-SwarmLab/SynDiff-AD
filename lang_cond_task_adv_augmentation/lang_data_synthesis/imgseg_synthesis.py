@@ -187,8 +187,8 @@ def get_waymo(config):
     
     # Obtain the segmentation mask
     prompt_tokens = {}
-    prompt_tokens['a_prompt'] = "Must contain " + dataset.get_text_description(object_masks)
-    prompt_tokens['n_prompt'] = "Must not contain " + dataset.get_text_description(object_masks)
+    prompt_tokens['a_prompt'] = "Must contain " + WaymoDataset.get_text_description(object_masks, dataset.CLASSES)
+    prompt_tokens['n_prompt'] = "Must not contain " +  WaymoDataset.get_text_description(object_masks, dataset.CLASSES)
     
     semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
     invalid_mask = dataset.get_unmapped_mask(object_masks)
