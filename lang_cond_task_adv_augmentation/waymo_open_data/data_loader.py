@@ -336,11 +336,12 @@ class WaymoDataset(Dataset):
                             'vegetation':'tree',
                             'sign':'signboard',
                             'sky':'sky',
-                            'ground_animal':'animal'
+                            'ground_animal':'animal',
+                            'pedestrian':'person',
+                            'bus': 'bus', 
                             }
         
-        self.COCO_CLASSES = {'pedestrian':'person', 
-                             'bus': 'bus', 
+        self.COCO_CLASSES = { 
                              'truck': 'truck',
                              'bicycle': 'bicycle',
                              'car':'car',
@@ -356,11 +357,12 @@ class WaymoDataset(Dataset):
                             'tree': [4, 200, 3],
                             'sky':[6, 230, 230],
                             'signboard': [255, 5, 153],
-                            'animal': [255, 0, 122]
+                            'animal': [255, 0, 122],
+                            'person': [150, 5, 61],
+                            'bus': [255, 0, 245],
                             }
         
-        self.COCO_COLORS = {'person': [220, 20, 60],
-                            'bus': [0, 60, 100],
+        self.COCO_COLORS = {
                             'truck': [0, 0, 70],
                             'bicycle': [119, 11, 32],
                             'car': [0, 0, 142],
@@ -394,7 +396,8 @@ class WaymoDataset(Dataset):
     def METADATA(self):
         return self._data_list
     
-    def get_text_description(self, object_mask: np.ndarray) -> str:
+    @staticmethod
+    def get_text_description(object_mask: np.ndarray, CLASSES) -> str:
         '''
         Returns the text description of the object mask
 
@@ -408,8 +411,25 @@ class WaymoDataset(Dataset):
         object_set = set(object_mask.flatten().tolist())
         text_description = ''
         for object in object_set:
-            text_description += self.CLASSES[object] + ', '
+            text_description += CLASSES[object] + ', '
         return text_description[:-1]
+    
+    # def get_text_description(self, object_mask: np.ndarray) -> str:
+    #     '''
+    #     Returns the text description of the object mask
+
+    #     Args:
+    #         object_mask: The object mask to extract the text description from
+        
+    #     Returns:
+    #         text_description: The text description of the object mask
+    #     '''
+        
+    #     object_set = set(object_mask.flatten().tolist())
+    #     text_description = ''
+    #     for object in object_set:
+    #         text_description += self.CLASSES[object] + ', '
+    #     return text_description[:-1]
     
     def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
         '''
