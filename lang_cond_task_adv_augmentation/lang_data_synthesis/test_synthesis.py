@@ -325,7 +325,7 @@ class EvaluateSynthesisFID:
                 if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
                     real_features = real_features[-1].reshape(N, C, H*W).mean(dim=-1)
                 elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
-                    real_features = real_features[-1].reshape(N, C, H*W).max(dim=-1)
+                    real_features = real_features[-1].reshape(N, C, H*W).max(dim=-1)[0]
                 real_features = real_features.cpu()
                 for i in range(0, len(data_samples)):
                     meta_data = data_samples[i].metainfo
@@ -352,7 +352,7 @@ class EvaluateSynthesisFID:
                 if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
                     fake_features = fake_features[-1].reshape(N, C, H*W).mean(dim=-1)
                 elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
-                    fake_features = fake_features[-1].reshape(N, C, H*W).max(dim=-1)
+                    fake_features = fake_features[-1].reshape(N, C, H*W).max(dim=-1)[0]
                 fake_features = fake_features.cpu()
                 for i in range(0, len(data_samples)):
                     meta_data = data_samples[i].metainfo
