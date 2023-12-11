@@ -13,6 +13,13 @@ from waymo_open_data import WaymoDataset
 import torch
 from copy import deepcopy
 from lang_data_synthesis.utils import write_to_csv_from_dict
+
+# from mmseg.registry import DATASETS, TRANSFORMS, MODELS
+# from avcv.dataset.dataset_wrapper import *
+# from mmengine.registry import init_default_scope
+# from tqdm import tqdm
+# init_default_scope('mmseg')
+
 class SyntheticAVGenerator:
     
     def __init__(
