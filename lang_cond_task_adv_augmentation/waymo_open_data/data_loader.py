@@ -277,7 +277,7 @@ class WaymoDataset(Dataset):
         # # Find the number of images
 
         # RGB colors used to visualize each semantic segmentation class.
-        
+        # WAMYO PALLETE
         self.CLASSES_TO_PALLETTE = {
             'undefined' : [0, 0, 0],#1
             'ego_vehicle': [102, 102, 102],#2
@@ -349,7 +349,7 @@ class WaymoDataset(Dataset):
                              'bird':'bird'
                             }
         
-        self.ADE_COLORS = {'pole': [51, 0, 255],
+        self.ADE_COLORS = { 'pole': [51, 0, 255],
                             'sidewalk': [235, 255, 7],
                             'building': [180, 120, 120],
                             'road': [140, 140, 140],
