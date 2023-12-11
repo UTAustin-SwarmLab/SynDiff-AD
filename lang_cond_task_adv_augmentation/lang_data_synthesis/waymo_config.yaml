@@ -1,0 +1,81 @@
+IMAGE:
+  ADE20K:
+    dataset: 'ADE20K' # 'waymo' or 'ADE20K'
+    image_id: 16868 # 0-1000 for waymo, 0-20209 for ADE20K
+    DATASET_PATH : 'ADE20K/dataset/' # separate path for waymo
+  WAYMO:
+    # All waymo parameters @markdown #### Replace this path with your own tfrecords. 
+    TRAIN_DIR: '/store/datasets/waymo/training/' #@param {type:"string"}
+    #@markdown #### Replace this directory with your own dataset folder for evaluation.
+    EVAL_DIR: '/store/datasets/waymo/validation/' #@param {type: "string"}
+    #@markdown #### Replace this path with the real path. Each line of the file is the "\, \" of a frame with camera segmentation labels.
+    TEST_SET_SOURCE: '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt' #@param {type: "string"} 
+
+    #@markdown #### Replace this directory with your own testing dataset folder.
+    TEST_DIR: '/store/datasets/waymo/testing/' #@param {type: "string"}
+    # Visualization Path
+    VIZ_DIR: '../waymo_data/visualization/' #@param {type: "string"}
+    NUM_CPU: 16 #@param {type: "integer"}
+    #which camera frames to save
+    SAVE_FRAMES: [0,1,2] #@param {type: "LIST"}
+    SAVE_DATA: True
+    PALLETE: 'ADE20K' # COCO, ADE20K, ADE20K_COCO
+  BDD100k:
+  
+control_net:
+  CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
+  MODEL_PATH: 'ControlNet/models/control_v11p_sd15_seg.pth'
+  SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
+SEGMENT_MODEL: 
+  TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
+GRADIO: False
+SAVE:
+  PATH: 'lang_data_synthesis/test_results/'
+SYNTHESIS_PARAMS:
+  CONTROL : 1.0
+  NUMSAMPLES : 2
+  GUESS : True
+  DETECT_RESOLUTION : 1024
+  IMAGE_RESOLUTION: 512
+  DDIMSTEPS : 30
+  SCALE: 9.0
+  SEED: 2000
+  ETA: 0.00
+  INIT_NOISE: 1.0
+  ANNOTATOR: 'Seg_OFADE20K'
+  A_PROMPT: 'camera like photo, realistic textures, HD quality'
+  N_PROMPT: 'unrealistic, very sharp, disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality'
+LLAVACAPTION:
+    MODELPATH: 'liuhaotian/llava-v1.5-13b'
+    MODELBASE: None
+    NUM_IMAGES: 'ALL' # 'ALL' or int
+    prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), lighting conditions and image quality. Don't mention the weather conditions or daytime."
+    conv_mode: 'llava_v1'
+    batch_size: 16
+    load_8bit: False
+    load_4bit: True
+    num_workers: 6
+    conditions_path: 'waymo_open_data/'
+    model_per_gpu: 2
+ROBUSTIFICATION:       
+  test_conditions : [
+    # ["Day", "Night"],
+    ["Clear", "Cloudy", "Rainy"]
+  ]
+  dataset_metadata_path: ""
+  classify: True
+  prompt_add: [
+    #'An image taken by a camera during {} time.',
+    'An image taken by a camera during {} weather conditions.'
+    ]
+  batch_size: 8
+SYN_DATASET_GEN:
+  target_prob_soft: 0.001
+  num_synthetic_images: 2500
+  dataset_path: '/store/harsh/data/waymo_synthetic/' # waymo_syntheitc_llava if use_llava_prompt is True
+  segmentation: True
+  conditions_path: 'waymo_open_data/'
+  use_llava_prompt: False
+  llava_prompt_path: 'waymo_open_data/'
+  fid_results_path: 'lang_data_synthesis/synthesis_results/'
+  fid_test_model: 'R50' # Swin-T or R50
