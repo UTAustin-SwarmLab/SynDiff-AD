@@ -12,6 +12,8 @@ import functools
 import tensorflow as tf
 from lang_data_synthesis.utils import ADE_20K_PALETTE, COCO_PALETTE
 import pandas as pd
+from PIL import Image
+
 class BDDDataset(Dataset):
     '''
     Loads the dataset from the pickled files
@@ -62,16 +64,16 @@ class BDDDataset(Dataset):
         elif not validation:
             # Normal data files
             if segmentation:
-                if os.path.exists(os.path.join(self.bdd_config.VAL_META_PATH,
+                if os.path.exists(os.path.join(self.bdd_config.TRAIN_META_PATH,
                                                 "metadata_train_seg.csv")):
-                    self.metadata_path = os.path.join(self.bdd_config.VAL_META_PATH,
+                    self.metadata_path = os.path.join(self.bdd_config.TRAIN_META_PATH,
                                                 "metadata_train_seg.csv")
                 self.contexts_path = os.path.join(self.bdd_config.TRAIN_META_PATH,
                                         "filenames_train_seg.txt")
             else:
-                if os.path.exists(os.path.join(self.bdd_config.VAL_META_PATH,
+                if os.path.exists(os.path.join(self.bdd_config.TRAIN_META_PATH,
                                                 "metadata_train_det.csv")):
-                    self.metadata_path = os.path.join(self.bdd_config.VAL_META_PATH,
+                    self.metadata_path = os.path.join(self.bdd_config.TRAIN_META_PATH,
                                                 "metadata_train_det.csv")
                 self.contexts_path = os.path.join(self.bdd_config.TRAIN_META_PATH,
                                         "filenames_train_det.txt")
@@ -173,14 +175,18 @@ class BDDDataset(Dataset):
                                                 "metadata_det.csv")
             
             added_images = 0
-            self.metadata_synth = None if self.metadata_path_synth is None else pd.read_csv(self.metadata_path_synth)
+            self.metadata_synth = None if self.metadata_path_synth is None\
+                else pd.read_csv(self.metadata_path_synth)
+                
             while added_images < self.synth_data_length:
                 with open(self.contexts_path_synth, 'r') as f:
                     
                     for line in f:
                         data_info = {
                             'file_name': line.strip(),
-                            
+                            'condition': self.metadata_synth[
+                                self.metadata_synth['file_name'] == line.strip()
+                                ]['condition'].values[0]
                         }
                         self.data_list.append(data_info)
                         self._num_images+=1
@@ -362,96 +368,28 @@ class BDDDataset(Dataset):
         if index >= self._num_images:
             raise IndexError("Index out of range")
 
-        context_frame = self._data
+        data = self.data_list[index]
         
-        with tf.device('cpu'):
-            if self.segmentation:
-                data = load_data_set_parquet(
-                    config=self.ds_config, 
-                    context_name=context_name, 
-                    validation=self.validation,
-                    context_frames=[context_frame],
-                    return_weather_cond=self.image_meta_data
-                )
-                if self.image_meta_data:
-                    frames_with_seg, camera_images, weather_list = data
-                else:
-                    frames_with_seg, camera_images = data
-
-                semantic_labels_multiframe, \
-                instance_labels_multiframe, \
-                panoptic_labels = read_semantic_labels(
-                    self.ds_config,
-                    frames_with_seg
-                )
-                
-                data = read_camera_images(
-                    self.ds_config,
-                    camera_images,
-                    return_weather_cond=self.image_meta_data,
-                    weather_conditions=weather_list
-                )
-
-                if self.image_meta_data:
-                    camera_images_frame, weather_labels_frame, lighting_conditions_frame = data
-                    weather = weather_labels_frame[0][camera_id]
-                    lighting_conditions = lighting_conditions_frame[0][camera_id]
-                    condition = weather + ', ' + lighting_conditions
-                else:
-                    camera_images_frame = data    
-                # All semantic labels are in the form of object indices defined by the PALLETE
-                camera_images = camera_images_frame[0][camera_id]
-                object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
-                instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
-
-                semantic_mask_rgb = self.get_semantic_mask(object_masks)
-                panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
-                                                                                instance_masks)
-            else:
-                boxes, camera_images = load_data_set_parquet(
-                    config=self.ds_config, 
-                    context_name=context_name, 
-                    validation=self.validation,
-                    context_frames=[context_frame],
-                    segmentation=False,
-                    return_weather_cond=self.image_meta_data
-                )
-                if self.image_meta_data:
-                    frames_with_seg, camera_images, weather_list = data
-                else:
-                    frames_with_seg, camera_images = data
-
-                box_classes, bounding_boxes = read_box_labels(
-                    self.ds_config,
-                    boxes
-                )
-                
-                camera_images_frame = read_camera_images(
-                    self.ds_config,
-                    camera_images,
-                    return_weather_cond=self.image_meta_data,
-                    weather_conditions=weather_list
-                )
-
-                if self.image_meta_data:
-                    camera_images_frame, weather_labels_frame, lighting_conditions_frame = data
-                    weather = weather_labels_frame[0][camera_id]
-                    lighting_conditions = lighting_conditions_frame[0][camera_id]
-                    condition = weather + ', ' + lighting_conditions
-                else:
-                    camera_images_frame = data  
-
-                camera_images = camera_images_frame[0][camera_id]
-                box_classes = box_classes[camera_id][0]
-                bounding_boxes = bounding_boxes[camera_id][0]
+        if 'condition' in data.keys():
+            condition = data['condition']
+            
+        file_name = data['file_name']
         
-        if self.image_meta_data:
-            img_data = {
-                'context_name': context_name,
-                'context_frame': context_frame,
-                'camera_id': camera_id,
-                'condition': condition
-            }
+        img_path = os.path.join(self.bdd_config.TRAIN_DIR,
+                                file_name + '.png')
+        ann_path = os.path.join(self.bdd_config.TRAIN_DIR,
+                                file_name + '.png')
+        
+        camera_images = np.array(Image.open(img_path)).astype(np.uint8)
+        if self.segmentation:
+            object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
+            instance_masks = object_masks.copy()
+            semantic_mask_rgb = self.get_semantic_mask(object_masks)
+        else:
+            raise NotImplementedError
+        
+        img_data = data
+ 
 
         if self.segmentation:
             if self.image_meta_data:
@@ -459,6 +397,7 @@ class BDDDataset(Dataset):
             else:
                 return camera_images, semantic_mask_rgb, instance_masks, object_masks
         else:
+            raise NotImplementedError
             if self.image_meta_data:
                 return camera_images, box_classes, bounding_boxes, img_data
             else:
@@ -472,7 +411,7 @@ class BDDDataset(Dataset):
 
     @property
     def METADATA(self):
-        return self._data_list
+        return self.data_list
     
     @staticmethod
     def get_text_description(object_mask: np.ndarray, CLASSES) -> str:
