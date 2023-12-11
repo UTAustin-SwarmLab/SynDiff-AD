@@ -13,6 +13,8 @@ from waymo_open_dataset.utils import camera_segmentation_utils
 from PIL import Image
 import io
 
+
+
 LabelProtoOrComponent = Union[
     dataset_pb2.CameraSegmentationLabel, v2.CameraSegmentationLabelComponent
 ]
