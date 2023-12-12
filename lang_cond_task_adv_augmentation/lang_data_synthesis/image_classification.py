@@ -13,7 +13,8 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current_dir)
 sys.path.append(parent)
 from copy import copy
-from waymo_open_data import WaymoDataset, waymo_collate_fn
+from waymo_open_data import WaymoDataset
+from lang_data_synthesis.dataset import collate_fn as collator
 import omegaconf
 import functools
 import torch.utils.data.dataloader as DataLoader
@@ -28,6 +29,10 @@ import tensorflow as tf
 import open_clip
 from lang_data_synthesis.utils import write_to_csv_from_dict
 from copy import deepcopy
+from argparse import ArgumentParser
+
+from bdd100k.data_loader import BDD100KDataset
+
 class CLIPClassifier:
     def __init__(self, 
                  config: omegaconf,
@@ -63,7 +68,7 @@ class CLIPClassifier:
         ])
         
         collate_fn = functools.partial(
-                waymo_collate_fn, 
+                collator, 
                 segmentation=self.dataset.segmentation,
                 image_meta_data=self.dataset.image_meta_data
             )
@@ -109,8 +114,8 @@ class CLIPClassifier:
                 score = similarity_scores[[j],cum_sum:cum_sum+len(classes)].softmax(dim=1)
                 cum_sum += len(classes)
                 
-                condition += (classes[torch.argmax(score, dim=1).item()] + ",")
-            condition_batch[j] = condition[:-1]
+                condition += (classes[torch.argmax(score, dim=1).item()] + ", ")
+            condition_batch[j] = condition[:-2]
         return condition_batch
 
     def classify(
@@ -132,12 +137,6 @@ class CLIPClassifier:
         #                                     shuffle=False,
         #                                     collate_fn=waymo_collate_fn,
         #                                     num_workers=0)
-        df = DataFrame(columns=['image_index', 
-                                'context_name',
-                                'context_frame',
-                                'camera_id',
-                                'condition'])
-        
         # Load from dataloader
         image_indices = 0
         for j, outputs in tqdm(enumerate(self.dataloader), total=len(self.dataloader)):
@@ -146,11 +145,12 @@ class CLIPClassifier:
             time = None
             if self.dataset.image_meta_data:
                 image_data = outputs[4]
-                condition = [img_data['condition'] for img_data in image_data]
-                time = [cond.split(",")[1] for cond in condition]
-            # condition = self.classify_image(torch.tensor(camera_images,
-            #                                           dtype=torch.float32
-            #                                         ).unsqueeze(0))  
+                condition = None
+                time = None
+                if 'condition' in image_data[0].keys():
+                    condition = [img_data['condition'] for img_data in image_data]
+                    time = [cond.split(",")[1] for cond in condition]
+
             condition_class = self.classify_image(camera_images.numpy())  
             condition = [] 
             if time is not None:
@@ -170,27 +170,76 @@ class CLIPClassifier:
                 
             image_indices += len(image_data)
         return None
-    
+
+
+def parse_args():
+    parser = ArgumentParser(description='Image Classification with CLIP')
+
+    parser.add_argument(
+        '--validation',
+        action='store_true',
+        default=False,
+        help='Use validation dataset')
+    parser.add_argument(
+        '--segmentation',
+        action='store_true',
+        default=False,
+        help='Enable it for the segmentation dataset')
+    parser.add_argument(
+        '--img_meta_data',
+        action = 'store_true',
+        default = False,
+        help = 'Enable it for the image meta data dataset')
+        
+    parser.add_argument(
+        '--experiment',
+        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        default='none',
+        help='Which experiment config to generate data for')
+
+    return parser.parse_args()
+
 if __name__=="__main__":
-    config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
-    SEGMENTATION = True
-    IMAGE_META_DATA = True
-    VALIDATION = False
+    
+
+    args = parse_args()
+    
+    SEGMENTATION = args.segmentation
+    IMAGE_META_DATA = args.img_meta_data
+    VALIDATION = args.validation
+    
     tf.config.set_visible_devices([], 'GPU')
-    if VALIDATION:
-        FILENAME = "waymo_open_data/waymo_env_conditions_val.csv"
+    
+    config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
+    config = omegaconf.OmegaConf.load(config_file_name)
+    if args.validation:
+        FILENAME = config.ROBUSTIFICATION.val_file_path
     else:
-        FILENAME = "waymo_open_data/waymo_env_conditions_train.csv"
+        FILENAME = config.ROBUSTIFICATION.train_file_path
+        
     if os.path.exists(FILENAME) and not config.ROBUSTIFICATION.classify:
         # Compute and show the number of images for each condition
         df = pd.read_csv(FILENAME)
         print(df.columns)
         print(df.groupby(['condition']).size()/len(df)*100)
     else:
-        dataset = WaymoDataset(config.IMAGE.WAYMO, 
+        if args.experiment == 'waymo':
+            dataset = WaymoDataset(config.IMAGE.WAYMO, 
                                 image_meta_data=IMAGE_META_DATA,
                                 segmentation=SEGMENTATION,
                                 validation=VALIDATION)
+        elif args.experiment == 'bdd':
+            dataset = BDD100KDataset(config.IMAGE.BDD, 
+                                image_meta_data=IMAGE_META_DATA,
+                                segmentation=SEGMENTATION,
+                                validation=VALIDATION)
+        elif args.experiment == 'plan':
+            raise NotImplementedError
+        elif args.experiment == 'cliport':
+            raise NotImplementedError
+        else:
+            raise ValueError("Experiment not supported")
+
         config.FILENAME = FILENAME
         classifier = CLIPClassifier(config, 
                                     dataset)
