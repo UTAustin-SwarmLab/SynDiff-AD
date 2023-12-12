@@ -78,13 +78,21 @@ class CLIPClassifier:
                                             collate_fn=collate_fn,
                                             num_workers=self.config.ROBUSTIFICATION.batch_size)
         
-        data_dict = {
-            "context_name":"content_name",
-            "context_frame":"context_frame",
-            "camera_id":"camera_id",
-            # "image_index":"image_index",
-            "condition":"condition"
-        }
+        if isinstance(dataset, WaymoDataset):
+            data_dict = {
+                "context_name":"content_name",
+                "context_frame":"context_frame",
+                "camera_id":"camera_id",
+                # "image_index":"image_index",
+                "condition":"condition"
+            }
+        elif isinstance(dataset, BDD100KDataset):
+            data_dict = {
+                "file_name":"file_name",
+                "condition":"condition"
+            }
+            
+            
         write_to_csv_from_dict(
                     dict_data=data_dict , 
                     csv_file_path= self.config.FILENAME,
@@ -146,17 +154,19 @@ class CLIPClassifier:
             if self.dataset.image_meta_data:
                 image_data = outputs[4]
                 condition = None
-                time = None
-                if 'condition' in image_data[0].keys():
+                # Only for waymo
+                if 'condition' in image_data[0].keys() and 'WAYMO' in config.IMAGE.keys():
                     condition = [img_data['condition'] for img_data in image_data]
                     time = [cond.split(",")[1] for cond in condition]
 
             condition_class = self.classify_image(camera_images.numpy())  
             condition = [] 
-            if time is not None:
+            if time is not None and 'WAYMO' in config.IMAGE.keys():
                 for t, cond in zip(time, condition_class):
                     cond = cond + "," + t
                     condition.append(cond)
+            else:
+                condition = condition_class
             
             # Add to df
             for idx in range(image_indices,image_indices+len(image_data)):
