@@ -92,7 +92,6 @@ class CLIPClassifier:
                 "condition":"condition"
             }
             
-            
         write_to_csv_from_dict(
                     dict_data=data_dict , 
                     csv_file_path= self.config.FILENAME,
