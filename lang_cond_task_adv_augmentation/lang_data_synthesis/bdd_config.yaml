@@ -1,27 +1,10 @@
 IMAGE:
-  ADE20K:
-    dataset: 'ADE20K' # 'waymo' or 'ADE20K'
-    image_id: 16868 # 0-1000 for waymo, 0-20209 for ADE20K
-    DATASET_PATH : 'ADE20K/dataset/' # separate path for waymo
-  WAYMO:
-    # All waymo parameters @markdown #### Replace this path with your own tfrecords. 
-    TRAIN_DIR: '/store/datasets/waymo/training/' #@param {type:"string"}
-    #@markdown #### Replace this directory with your own dataset folder for evaluation.
-    EVAL_DIR: '/store/datasets/waymo/validation/' #@param {type: "string"}
-    #@markdown #### Replace this path with the real path. Each line of the file is the "\, \" of a frame with camera segmentation labels.
-    TEST_SET_SOURCE: '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt' #@param {type: "string"} 
-
-    #@markdown #### Replace this directory with your own testing dataset folder.
-    TEST_DIR: '/store/datasets/waymo/testing/' #@param {type: "string"}
-    # Visualization Path
-    VIZ_DIR: '../waymo_data/visualization/' #@param {type: "string"}
-    NUM_CPU: 16 #@param {type: "integer"}
-    #which camera frames to save
-    SAVE_FRAMES: [0,1,2] #@param {type: "LIST"}
-    SAVE_DATA: True
-    PALLETE: 'ade20k' # Choices: coco, ade20k, waymo 
-  BDD100k:
-  
+  BDD:
+    DATASET_DIR: '/store/datasets/bdd100k/'
+    SYNTH_TRAIN_DIR: None # Always set in the sub programs
+    TRAIN_META_PATH: 'bdd100k/'
+    VAL_META_PATH: 'bdd100k/'
+    PALLETE: 'COCO' # COCO or BDD or ADE20K 
 control_net:
   CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
   MODEL_PATH: 'ControlNet/models/control_v11p_sd15_seg.pth'
@@ -32,6 +15,7 @@ GRADIO: False
 SAVE:
   PATH: 'lang_data_synthesis/test_results/'
 SYNTHESIS_PARAMS:
+  SYNTH_TRAIN_DIR: None # Always set in the sub programs
   CONTROL : 1.0
   NUMSAMPLES : 2
   GUESS : True
@@ -59,19 +43,18 @@ LLAVACAPTION:
     model_per_gpu: 2
 ROBUSTIFICATION:       
   test_conditions : [
-    # ["Day", "Night"],
-    ["Clear", "Cloudy", "Rainy"]
+    ["Clear", "Cloudy", "Rainy"],
+    ["Day", "Dawn/Dusk", "Night"]
   ]
   dataset_metadata_path: ""
   classify: True
   prompt_add: [
-    #'An image taken by a camera during {} time.',
-    'An image taken by a camera during {} weather conditions.'
+    'An image taken during {} weather conditions.',
+    'An image taken during {} time.'
     ]
   batch_size: 8
-  train_file_path : 'waymo_open_data/waymo_env_conditions_train.csv'
-  val_file_path : 'waymo_open_data/waymo_env_conditions_val.csv'
-
+  train_file_path : 'bdd100k/metadata_train_seg.csv'
+  val_file_path : 'bdd100k/metadata_val_seg.csv'
 SYN_DATASET_GEN:
   target_prob_soft: 0.001
   num_synthetic_images: 2500
