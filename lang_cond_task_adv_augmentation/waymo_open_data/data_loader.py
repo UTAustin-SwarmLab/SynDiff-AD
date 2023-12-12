@@ -18,6 +18,9 @@ from waymo_open_dataset.utils import camera_segmentation_utils
 import torch 
 import functools
 
+from lang_data_synthesis.dataset import ExpDataset, collate_fn
+from lang_data_synthesis.utils import ADE_20K_PALETTE, COCO_PALETTE
+
 def image_mask_pickler(config, validation=False):
     '''
     Extracts the image, and image segmentation mask from the files as an np array
@@ -163,7 +166,7 @@ def load_context_list(config, context_name, idx, total_contexts, validation):
                                                                       validation))
     return
 
-class WaymoDataset(Dataset):
+class WaymoDataset(ExpDataset):
     '''
     Loads the dataset from the pickled files
     '''
@@ -322,98 +325,93 @@ class WaymoDataset(Dataset):
         # object indices to the rgb colors
         
          # Useful for downstream synthesis
-        self.UNMAPPED_CLASSES = ['undefined', 'ego_vehicle', 'dynamic', 'static','ground',
-                                 'other_large_vehicle',   'trailer',
-                                 'pedestrian_object', 'cyclist', 
-                                 'motorcyclist', 'construction_cone_pole',
-                                 'lane_marker', 'road_marker' ]
+
         # Useful for semantic mapping
-        self.ADE_CLASSES = {'pole':'pole', 
+
+        self.ADE_CLASS_MAPPING = {
                             'sidewalk':'sidewalk',
                             'building':'building',
                             'road':'road',
                             'traffic_light': 'traffic light',
                             'vegetation':'tree',
-                            'sign':'signboard',
+                            'traffic sign':'signboard',
                             'sky':'sky',
                             'ground_animal':'animal',
                             'pedestrian':'person',
                             'bus': 'bus', 
+                            'wall': 'wall',
+                            'fence': 'fence',
+                            'pole': 'pole',
+                            'car': 'car',
+                            'truck': 'truck',
+                            'bicycle': 'bicycle',
+                            'bus'  : 'bus',
                             }
-        
-        self.COCO_CLASSES = { 
+        self.UNMAPPED_CLASSES_ADE = set(self.CLASSES_TO_PALLETTE.keys())\
+            - set(self.ADE_CLASS_MAPPING.keys())
+            
+            
+        self.COCO_CLASS_MAPPING = { 
+                             'road':'road',
+                             'bus': 'bus',
+                             'train':'train',
                              'truck': 'truck',
                              'bicycle': 'bicycle',
-                             'car':'car',
+                             'sign': 'stop sign',
+                             'traffic_light': 'traffic light',
                              'motorcycle':'motorcycle', 
-                             'bird':'bird'
+                             'building': 'building-other-merged',
+                             'wall': 'wall-other-merged',
+                             'fence': 'fence-merged',
+                             'pedestrian': 'person',
+                             'car': 'car',
+                             'sky': 'sky-other-merged',
+                             'vegetation': 'tree-merged',
+                             'motorcycle': 'motorcycle',
+                             'sidewalk': 'pavement-other-merged',
+                             'bird': 'bird',
+                             'ground_animal':'dog'
                             }
         
-        self.ADE_COLORS = { 'pole': [51, 0, 255],
-                            'sidewalk': [235, 255, 7],
-                            'building': [180, 120, 120],
-                            'road': [140, 140, 140],
-                            'traffic light': [41, 0, 255],
-                            'tree': [4, 200, 3],
-                            'sky':[6, 230, 230],
-                            'signboard': [255, 5, 153],
-                            'animal': [255, 0, 122],
-                            'person': [150, 5, 61],
-                            'bus': [255, 0, 245],
-                            }
+        self.UNMAPPED_CLASSES_COCO = set(self.CLASSES_TO_PALLETTE.keys())\
+            - set(self.COCO_CLASS_MAPPING.keys())
         
-        self.COCO_COLORS = {
-                            'truck': [0, 0, 70],
-                            'bicycle': [119, 11, 32],
-                            'car': [0, 0, 142],
-                            'motorcycle': [0, 0, 230],
-                            'bird': [127, 96, 0]
-                            }
+        self.UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE.intersection(
+            self.UNMAPPED_CLASSES_COCO)
+        
+        if self.ds_config.PALLETE == "waymo":
+            self.CLASSES_TO_PALLETE_SYNTHETIC = self.CLASSES_TO_PALLETTE
+            return
+        elif self.ds_config.PALLETE == "ade20k":
+            UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE
+            MAPPED_CLASSES = self.ADE_CLASS_MAPPING
+            COLORS = ADE_20K_PALETTE
+        elif self.ds_config.PALLETE == "coco":
+            UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_COCO
+            MAPPED_CLASSES = self.COCO_CLASS_MAPPING
+            COLORS = COCO_PALETTE
+        else:
+            UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE
+            MAPPED_CLASSES = self.ADE_CLASS_MAPPING
+            COLORS = ADE_20K_PALETTE
+        
         
         self.CLASSES_TO_PALLETE_SYNTHETIC = {}
         self.UNMAPPED_CLASS_IDX = []
         for j, (key,color)  in enumerate(self.CLASSES_TO_PALLETTE.items()):
-            if key in self.UNMAPPED_CLASSES:
+            if key in UNMAPPED_CLASSES:
                 self.CLASSES_TO_PALLETE_SYNTHETIC[key] = color
                 self.UNMAPPED_CLASS_IDX.append(j)
-            elif key in self.ADE_CLASSES.keys():
-                self.CLASSES_TO_PALLETE_SYNTHETIC[key] = self.ADE_COLORS[self.ADE_CLASSES[key]]
-            elif key in self.COCO_CLASSES.keys():
-                self.CLASSES_TO_PALLETE_SYNTHETIC[key] = self.COCO_COLORS[self.COCO_CLASSES[key]]
+            elif key in MAPPED_CLASSES.keys():
+                self.CLASSES_TO_PALLETE_SYNTHETIC[key] = COLORS[MAPPED_CLASSES[key]]
         
         self.UNMAPPED_CLASS_IDX = np.array(self.UNMAPPED_CLASS_IDX)
         self.color_map_synth = np.array(
             list(self.CLASSES_TO_PALLETE_SYNTHETIC.values()))\
                 .astype(np.uint8)  
+     
         
-    def __len__(self) -> int:
-        # return max(len(self.camera_files), 
-        #             len(self.segment_files), 
-        #             len(self.instance_files))
-        return self._num_images
 
-    @property
-    def METADATA(self):
-        return self._data_list
-    
-    @staticmethod
-    def get_text_description(object_mask: np.ndarray, CLASSES) -> str:
-        '''
-        Returns the text description of the object mask
-
-        Args:
-            object_mask: The object mask to extract the text description from
-        
-        Returns:
-            text_description: The text description of the object mask
-        '''
-        
-        object_set = set(object_mask.flatten().tolist())
-        text_description = ''
-        for object in object_set:
-            text_description += CLASSES[object] + ', '
-        return text_description[:-1]
-    
     # def get_text_description(self, object_mask: np.ndarray) -> str:
     #     '''
     #     Returns the text description of the object mask
@@ -430,44 +428,6 @@ class WaymoDataset(Dataset):
     #     for object in object_set:
     #         text_description += self.CLASSES[object] + ', '
     #     return text_description[:-1]
-    
-    def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
-        '''
-        Returns the semantic mask from the object mask
-
-        Args:
-            object_mask: The object mask to extract the semantic mask from
-        
-        Returns:
-            semantic_mask: The semantic mask of the object mask
-        '''
-        semantic_mask = self.color_map[object_mask.squeeze()]
-        return semantic_mask
-
-    def get_mapped_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
-        '''
-        Returns the semantic mask from the object mask mapped to the ADE20K classes
-        or COCO semantic classes
-
-        Args:
-            object_mask: The object mask to extract the semantic mask from
-        
-        Returns:
-            semantic_mask: The semantic mask of the object mask
-        '''
-        
-        # convert all the ade20k objects in the color mask to
-        semantic_mask = self.color_map_synth[object_mask.squeeze()]
-        return semantic_mask
-        
-    def get_unmapped_mask(self, object_mask: np.ndarray) -> np.ndarray:
-        '''
-        Returns a boolean mask whether the object mask category is mapped or not
-        '''
-        mask = np.zeros(object_mask.shape, dtype=np.bool)
-        for idx in self.UNMAPPED_CLASS_IDX:
-            mask = np.logical_or(mask, object_mask == idx)
-        return mask
     
     def __getitem__(
             self, 
@@ -643,34 +603,6 @@ class WaymoDataset(Dataset):
             else:
                 return camera_images, box_classes, bounding_boxes
 
-def waymo_collate_fn(
-        data,
-        segmentation=False, 
-        image_meta_data=False):
-
-    if not segmentation and not image_meta_data:
-        images, labels, boxes = zip(*data)
-        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
-        return images, labels, boxes
-    elif not segmentation and image_meta_data:
-        images, labels, boxes, img_data = zip(*data)
-        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
-        return images, labels, boxes, img_data
-    elif segmentation and not image_meta_data:
-        images, sem_masks, instance_masks, object_masks = zip(*data)
-        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
-        sem_masks = torch.tensor(np.stack(sem_masks, 0), dtype=torch.uint8)
-        instance_masks = torch.tensor(np.stack(instance_masks, 0), dtype=torch.int64)
-        object_masks = torch.tensor(np.stack(object_masks, 0), dtype=torch.int64)
-        return images, sem_masks, instance_masks, object_masks
-    else:
-        images, sem_masks, instance_masks, object_masks, img_data = zip(*data)
-        images = torch.tensor(np.stack(images, 0), dtype=torch.uint8)
-        sem_masks = torch.tensor(np.stack(sem_masks, 0), dtype=torch.uint8)
-        instance_masks = torch.tensor(np.stack(instance_masks, 0), dtype=torch.int64)
-        object_masks = torch.tensor(np.stack(object_masks, 0), dtype=torch.int64)
-        return images, sem_masks, instance_masks, object_masks, img_data
-
 if __name__ == '__main__':
     config = omegaconf.OmegaConf.load('waymo_open_data/config.yaml')
     SEGMENTATION = True
@@ -692,7 +624,7 @@ if __name__ == '__main__':
         # try except
         try:
             collate_fn = functools.partial(
-                waymo_collate_fn, 
+                collate_fn, 
                 segmentation=SEGMENTATION,
                 image_meta_data=IMAGE_META_DATA
             )
