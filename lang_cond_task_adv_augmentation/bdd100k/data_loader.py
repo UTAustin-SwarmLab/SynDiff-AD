@@ -14,7 +14,9 @@ from lang_data_synthesis.utils import ADE_20K_PALETTE, COCO_PALETTE
 import pandas as pd
 from PIL import Image
 
-class BDDDataset(Dataset):
+from lang_data_synthesis.dataset import ExpDataset
+
+class BDD100KDataset(ExpDataset):
     '''
     Loads the dataset from the pickled files
     '''
@@ -37,13 +39,18 @@ class BDDDataset(Dataset):
         
         #self.segment_frames = dict()
         self._num_images = 0
-        self.ds_config = config
         self.validation = validation
         self.segmentation = segmentation
         self.image_meta_data = image_meta_data
         self.bdd_config = config
-        self.data_list = []
+        self._data_list = []
         
+        # Set TRAIN_DIR, ANN_TRAIN_DIR, VAL_DIR , ANN_VAL_DIR
+        # self.bdd_config.IMG_DIR = os.path.join(self.bdd_config.TRAIN_DIR, "images/10k/train")
+        # self.bdd_config.MASK_DIR = os.path.join(self.bdd_config.VAL_DIR, "images/10k/val")
+        # self.bdd_config.ANN_TRAIN_DIR = os.path.join(self.bdd_config.TRAIN_DIR, "labels/sem_seg/masks/train")
+        # self.bdd_config.ANN_VAL_DIR = os.path.join(self.bdd_config.VAL_DIR, "labels/sem_seg/masks/val")
+                
         # Need to change in accordance with the proposed synthetic dataset structure
         self.metadata_path = None
         if validation:
@@ -61,6 +68,10 @@ class BDDDataset(Dataset):
                                                 "metadata_val_seg.csv")
                 self.contexts_path = os.path.join(self.bdd_config.VAL_META_PATH,
                                         "filenames_val_det.txt")
+            
+            self.bdd_config.IMG_DIR = os.path.join(self.bdd_config.DATASET_DIR, "images/10k/val")
+            self.bdd_config.MASK_DIR = os.path.join(self.bdd_config.DATASET_DIR, "labels/sem_seg/masks/val")
+        
         elif not validation:
             # Normal data files
             if segmentation:
@@ -77,6 +88,9 @@ class BDDDataset(Dataset):
                                                 "metadata_train_det.csv")
                 self.contexts_path = os.path.join(self.bdd_config.TRAIN_META_PATH,
                                         "filenames_train_det.txt")
+                
+            self.bdd_config.IMG_DIR = os.path.join(self.bdd_config.DATASET_DIR, "images/10k/train")
+            self.bdd_config.MASK_DIR = os.path.join(self.bdd_config.DATASET_DIR, "labels/sem_seg/masks/train")
             
             # Synthetic data files
             if self.bdd_config.SYNTH_TRAIN_DIR is not None:
@@ -106,10 +120,7 @@ class BDDDataset(Dataset):
                    segmentation: bool = True,
                    validation: bool = False,
                    image_meta_data: bool = False) -> None:
-        
-        self.synth_data_length = int(len(self.data_list)/(1 - self.mixing_ratio)) \
-            - len(self.data_list)
-        
+
         # Need to change in accordance with the proposed synthetic dataset structure
         self.metadata_path = None
         if validation:
@@ -155,13 +166,12 @@ class BDDDataset(Dataset):
                 if self.metadata is not None:
                     data_info['condition'] = self.metadata[self.metadata['file_name'] == line.strip()]['condition'].values[0]
 
-                self.data_list.append(data_info)
+                self._data_list.append(data_info)
                 self._num_images+=1
-                added_images+=1
 
-        if not validation and self.bdd_config.SYNTH_TRAIN_DIR is not None:
-            self.synth_data_length = int(len(self.data_list)/(1 - self.mixing_ratio)) \
-                - len(self.data_list)
+        if not validation and self.bdd_config.SYNTH_TRAIN_DIR != 'None':
+            self.synth_data_length = int(len(self._data_list)/(1 - self.mixing_ratio)) \
+                - len(self._data_list)
 
             if segmentation:
                 self.context_path_synth = os.path.join(self.bdd_config.SYNTH_TRAIN_DIR,
@@ -188,7 +198,7 @@ class BDDDataset(Dataset):
                                 self.metadata_synth['file_name'] == line.strip()
                                 ]['condition'].values[0]
                         }
-                        self.data_list.append(data_info)
+                        self._data_list.append(data_info)
                         self._num_images+=1
                         added_images+=1
             
@@ -269,8 +279,8 @@ class BDDDataset(Dataset):
                              'sidewalk': 'pavement-other-merged'
                             }
         
-        self.UNMAPPED_CLASSES_COCO = set(self.CLASSES_TO_PALLETTE.keys())
-        - set(self.COCO_CLASSES.keys())
+        self.UNMAPPED_CLASSES_COCO = set(self.CLASSES_TO_PALLETTE.keys())\
+        - set(self.COCO_CLASS_MAPPING.keys())
         
         self.UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE.intersection(
             self.UNMAPPED_CLASSES_COCO)
@@ -306,46 +316,7 @@ class BDDDataset(Dataset):
             list(self.CLASSES_TO_PALLETE_SYNTHETIC.values()))\
                 .astype(np.uint8)  
     
-    def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
-        '''
-        Returns the semantic mask from the object mask
 
-        Args:
-            object_mask: The object mask to extract the semantic mask from
-        
-        Returns:
-            semantic_mask: The semantic mask of the object mask
-        '''
-        semantic_mask = self.color_map[object_mask.squeeze()]
-        return semantic_mask
-
-    def get_mapped_semantic_mask(self, 
-                                 object_mask: np.ndarray) -> np.ndarray:
-        '''
-        Returns the semantic mask from the object mask mapped to the ADE20K classes
-        or COCO semantic classes
-
-        Args:
-            object_mask: The object mask to extract the semantic mask from
-        
-        Returns:
-            semantic_mask: The semantic mask of the object mask
-        '''
-        
-        # convert all the ade20k objects in the color mask to
-        semantic_mask = self.color_map_synth[object_mask.squeeze()]
-        return semantic_mask
-        
-    def get_unmapped_mask(self,
-                          object_mask: np.ndarray) -> np.ndarray:
-        '''
-        Returns a boolean mask whether the object mask category is mapped or not
-        '''
-        mask = np.zeros(object_mask.shape, dtype=np.bool)
-        for idx in self.UNMAPPED_CLASS_IDX:
-            mask = np.logical_or(mask, object_mask == idx)
-        return mask
-    
     def __getitem__(
             self, 
             index:int
@@ -368,21 +339,21 @@ class BDDDataset(Dataset):
         if index >= self._num_images:
             raise IndexError("Index out of range")
 
-        data = self.data_list[index]
+        data = self._data_list[index]
         
         if 'condition' in data.keys():
             condition = data['condition']
             
         file_name = data['file_name']
-        
-        img_path = os.path.join(self.bdd_config.TRAIN_DIR,
-                                file_name + '.png')
-        ann_path = os.path.join(self.bdd_config.TRAIN_DIR,
+        img_path = os.path.join(self.bdd_config.IMG_DIR,
+                                file_name + '.jpg')
+        ann_path = os.path.join(self.bdd_config.MASK_DIR,
                                 file_name + '.png')
         
         camera_images = np.array(Image.open(img_path)).astype(np.uint8)
         if self.segmentation:
             object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
+            object_masks = (object_masks + 1)%256
             instance_masks = object_masks.copy()
             semantic_mask_rgb = self.get_semantic_mask(object_masks)
         else:
@@ -403,30 +374,3 @@ class BDDDataset(Dataset):
             else:
                 return camera_images, box_classes, bounding_boxes
     
-    def __len__(self) -> int:
-        # return max(len(self.camera_files), 
-        #             len(self.segment_files), 
-        #             len(self.instance_files))
-        return self._num_images
-
-    @property
-    def METADATA(self):
-        return self.data_list
-    
-    @staticmethod
-    def get_text_description(object_mask: np.ndarray, CLASSES) -> str:
-        '''
-        Returns the text description of the object mask
-
-        Args:
-            object_mask: The object mask to extract the text description from
-        
-        Returns:
-            text_description: The text description of the object mask
-        '''
-        
-        object_set = set(object_mask.flatten().tolist())
-        text_description = ''
-        for object in object_set:
-            text_description += CLASSES[object] + ', '
-        return text_description[:-1]
