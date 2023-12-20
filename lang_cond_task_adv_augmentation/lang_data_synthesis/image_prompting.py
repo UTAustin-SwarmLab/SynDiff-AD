@@ -19,7 +19,8 @@ from io import BytesIO
 
 from lang_data_synthesis.utils import convert_pallette_segment
 import omegaconf
-from waymo_open_data import WaymoDataset, waymo_collate_fn
+from waymo_open_data import WaymoDataset
+
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -27,51 +28,70 @@ import functools
 import torch.utils.data.dataloader as DataLoader
 import tensorflow as tf
 
+from bdd100k.data_loader import BDD100KDataset
+from lang_data_synthesis.dataset import collate_fn as collator
+from lang_data_synthesis.dataset import Dataset
+
 import multiprocessing
 from multiprocessing import Process, Queue
 
+from argparse import ArgumentParser
+
 class LLaVACaption:
     '''
-    Class to generate captions for the Waymo Open Dataset
+    Class to generate captions for the Robotics Tasks.
+    We are only captioning the training datasets
     '''
 
-    def __init__(self, config:omegaconf, dataset:WaymoDataset):
+    def __init__(self, config:omegaconf, 
+                 dataset:Dataset):
         self.config = config
-        self.dataset:WaymoDataset = dataset
+        self.dataset:Dataset = dataset
     
-        FILENAME = self.config.LLAVACAPTION.conditions_path + "waymo_env_conditions_train.csv"
+        FILENAME = self.config.LLAVACAPTION.conditions_path 
         self.conditions_metadata = pd.read_csv(FILENAME)
-        data_dict = {
-                    "context_name":"content_name",
-                    "context_frame":"context_frame",
-                    "camera_id":"camera_id",
-                    # "image_index":"image_index",
-                    "caption":"caption"
-                }
+        
+        if isinstance(self.dataset, WaymoDataset):
+            data_dict = {
+                        "context_name":"content_name",
+                        "context_frame":"context_frame",
+                        "camera_id":"camera_id",
+                        # "image_index":"image_index",
+                        "caption":"caption"
+            }
+        elif isinstance(self.dataset, BDD100KDataset):
+            data_dict = {
+                        "file_name":"file_name",
+                        "caption":"caption"
+            }
         if config.LLAVACAPTION.num_workers > 0:
             for j in range(self.config.LLAVACAPTION.num_workers):
                 write_to_csv_from_dict(
                             dict_data=data_dict , 
-                            csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train{}.csv".format(j),
+                            csv_file_path= self.config.LLAVACAPTION.captions_path_multi.format(j),
                             file_name=""
                         )
         else:
              write_to_csv_from_dict(
                         dict_data=data_dict , 
-                        csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train.csv",
+                        csv_file_path= self.config.LLAVACAPTION.captions_path_single,
                         file_name=""
                         )
             
         collate_fn = functools.partial(
-                waymo_collate_fn, 
+                collator, 
                 segmentation=self.dataset.segmentation,
                 image_meta_data=self.dataset.image_meta_data
             )
-        self.dataloader = DataLoader.DataLoader(self.dataset,
-                                            batch_size=self.config.LLAVACAPTION.batch_size,
-                                            shuffle=False,
-                                            collate_fn=collate_fn,
-                                            num_workers=self.config.LLAVACAPTION.batch_size)
+        
+        self.dataloader = DataLoader.DataLoader(
+            dataset=self.dataset,
+            batch_size=self.config.LLAVACAPTION.batch_size,
+            shuffle=False,
+            collate_fn=collate_fn,
+            num_workers=self.config.LLAVACAPTION.batch_size
+        )
+        
     def load_image(self,
                 index,
                 batch_size: int = 1):
@@ -172,6 +192,7 @@ class LLaVACaption:
                        conditions_metadata,
                        get_text_description:Callable,
                        get_caption:Callable,
+                       dataset_type = 'waymo'
                        ):
         """
         Worker process that fetches a batch from the queue, processes it, and returns the result.
@@ -220,28 +241,38 @@ class LLaVACaption:
                     # column_names.append(tuple(keys + ['caption']))
                     # Modify the condition
                     
-                    condition_data = conditions_metadata.loc[
-                        (conditions_metadata['context_frame'] == image_data['context_frame']) &
-                        (conditions_metadata['context_name'] == image_data['context_name']) &
-                        (conditions_metadata['camera_id'] == image_data['camera_id'])
-                    ]['condition'].values.tolist()[0]
+                    if dataset_type == 'waymo':
+                        condition_data = conditions_metadata.loc[
+                            (conditions_metadata['context_frame'] == image_data['context_frame']) &
+                            (conditions_metadata['context_name'] == image_data['context_name']) &
+                            (conditions_metadata['camera_id'] == image_data['camera_id'])
+                        ]['condition'].values.tolist()[0]
+                    elif dataset_type == 'bdd':
+                        condition_data = conditions_metadata.loc[
+                            (conditions_metadata['file_name'] == image_data['file_name'])
+                        ]['condition'].values.tolist()[0]
                     
                     image_data['condition'] = condition_data
                     weather = image_data['condition'].split(",")[0]
                     time = image_data['condition'].split(",")[1]
                     caption = " This image is taken during {} time of the day and features {} weather. ".format(time, weather) + caption
                     
-                    data_dict = {
-                        "context_name":image_data['context_name'],
-                        "context_frame":image_data['context_frame'],
-                        "camera_id":image_data['camera_id'],
-                        # "image_index":image_data['image_index'],
-                        "caption":caption
-                    }
-                    
+                    if dataset_type == 'waymo':
+                        data_dict = {
+                            "context_name":image_data['context_name'],
+                            "context_frame":image_data['context_frame'],
+                            "camera_id":image_data['camera_id'],
+                            # "image_index":image_data['image_index'],
+                            "caption":caption
+                        }
+                    elif dataset_type == 'bdd':
+                        data_dict = {
+                            "file_name":image_data['file_name'],
+                            "caption":caption
+                        }
                     write_to_csv_from_dict(
                             dict_data=data_dict , 
-                            csv_file_path= config.LLAVACAPTION.conditions_path + "waymo_captions_train{}.csv".format(worker_id),
+                            csv_file_path= config.LLAVACAPTION.captions_path_multi.format(worker_id),
                             file_name=""
                         )
             #result_queue.put(True)
@@ -297,7 +328,12 @@ class LLaVACaption:
                     image = camera_images[j]
                     object_mask = object_masks[j]
                     image_data = image_data_batch[j]
-                    prompt_tokens = self.dataset.get_text_description(object_mask)
+                    if isinstance(self.dataset, WaymoDataset):
+                        prompt_tokens = WaymoDataset.get_text_description(object_mask)
+                        dataset_type = 'waymo'
+                    elif isinstance(self.dataset, BDD100KDataset):
+                        prompt_tokens = BDD100KDataset.get_text_description(object_mask)
+                        dataset_type = 'bdd'
                     caption, _ = self.get_caption(model, 
                                         model_name, 
                                         image_processor, 
@@ -314,28 +350,46 @@ class LLaVACaption:
                     # column_names.append(tuple(keys + ['caption']))
                     # Modify the condition
                     
-                    condition_data = self.conditions_metadata.loc[
-                        (self.conditions_metadata['context_frame'] == image_data['context_frame']) &
-                        (self.conditions_metadata['context_name'] == image_data['context_name']) &
-                        (self.conditions_metadata['camera_id'] == image_data['camera_id'])
-                    ]['condition'].values.tolist()[0]
+                    # condition_data = self.conditions_metadata.loc[
+                    #     (self.conditions_metadata['context_frame'] == image_data['context_frame']) &
+                    #     (self.conditions_metadata['context_name'] == image_data['context_name']) &
+                    #     (self.conditions_metadata['camera_id'] == image_data['camera_id'])
+                    # ]['condition'].values.tolist()[0]
+                    
+                    if dataset_type == 'waymo':
+                        condition_data = self.conditions_metadata.loc[
+                            (self.conditions_metadata['context_frame'] == image_data['context_frame']) &
+                            (self.conditions_metadata['context_name'] == image_data['context_name']) &
+                            (self.conditions_metadataa['camera_id'] == image_data['camera_id'])
+                        ]['condition'].values.tolist()[0]
+                    elif dataset_type == 'bdd':
+                        condition_data = self.conditions_metadata.loc[
+                            (self.conditions_metadata['file_name'] == image_data['file_name'])
+                        ]['condition'].values.tolist()[0]
+                    
                     
                     image_data['condition'] = condition_data
                     weather = image_data['condition'].split(",")[0]
                     time = image_data['condition'].split(",")[1]
                     caption = " This image is taken during {} time of the day and features {} weather. ".format(time, weather) + caption
                     
-                    data_dict = {
-                        "context_name":image_data['context_name'],
-                        "context_frame":image_data['context_frame'],
-                        "camera_id":image_data['camera_id'],
-                        # "image_index":image_data['image_index'],
-                        "caption":caption
-                    }
+                    if dataset_type == 'waymo':
+                        data_dict = {
+                            "context_name":image_data['context_name'],
+                            "context_frame":image_data['context_frame'],
+                            "camera_id":image_data['camera_id'],
+                            # "image_index":image_data['image_index'],
+                            "caption":caption
+                        }
+                    elif dataset_type == 'bdd':
+                        data_dict = {
+                            "file_name":image_data['file_name'],
+                            "caption":caption
+                        }
                     
                     write_to_csv_from_dict(
                             dict_data = data_dict, 
-                            csv_file_path= self.config.LLAVACAPTION.conditions_path + "waymo_captions_train.csv",
+                            csv_file_path= self.config.LLAVACAPTION.captions_path_single,
                             file_name=""
                     )
             # captions.append([tuple(values + [caption])])
@@ -371,9 +425,15 @@ class LLaVACaption:
         else:
             self.config.LLAVACAPTION.conv_mode = conv_mode
         
-        get_text_description = functools.partial(WaymoDataset.get_text_description, 
+        if isinstance(self.dataset, WaymoDataset):
+            get_text_description = functools.partial(WaymoDataset.get_text_description, 
                                                  CLASSES=self.dataset.CLASSES)
-        # Start worker processes
+            dataset_type = 'waymo'
+        elif isinstance(self.dataset, BDD100KDataset):
+            get_text_description = functools.partial(BDD100KDataset.get_text_description, 
+                                                 CLASSES=self.dataset.CLASSES)
+            dataset_type = 'bdd'
+        
         workers = [Process(target=LLaVACaption.worker_process, 
                            args=(queue,
                                  self.config.LLAVACAPTION.MODELPATH,
@@ -384,7 +444,8 @@ class LLaVACaption:
                                  i,
                                  self.conditions_metadata,
                                  get_text_description,
-                                 LLaVACaption.get_caption
+                                 LLaVACaption.get_caption,
+                                 dataset_type
                                  ))
                    for i in range(num_workers)]
 
@@ -410,10 +471,48 @@ class LLaVACaption:
 
         # return all_captions
 
+def parse_args():
+    parser = ArgumentParser(description='Image Classification with CLIP')
+
+    parser.add_argument(
+        '--validation',
+        action='store_true',
+        default=False,
+        help='Use validation dataset')
+    parser.add_argument(
+        '--segmentation',
+        action='store_true',
+        default=False,
+        help='Enable it for the segmentation dataset')
+    parser.add_argument(
+        '--img_meta_data',
+        action = 'store_true',
+        default = False,
+        help = 'Enable it for the image meta data dataset')
+        
+    parser.add_argument(
+        '--experiment',
+        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        default='none',
+        help='Which experiment config to generate data for')
+
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    config = omegaconf.OmegaConf.load("lang_data_synthesis/config.yaml")
+    args = parse_args()
+    
+    config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
+    config = omegaconf.OmegaConf.load(config_file_name)
+    
     tf.config.set_visible_devices([], 'GPU')
-    dataset = WaymoDataset(config.IMAGE.WAYMO, image_meta_data=True)
+    
+    if args.experiment == 'waymo':
+        dataset = WaymoDataset(config.IMAGE.WAYMO, image_meta_data=True)
+    elif args.experiment =='bdd':
+        dataset = BDD100KDataset(config.IMAGE.BDD, image_meta_data=True)
+    else:
+        raise NotImplementedError
+    
     captioner = LLaVACaption(config, dataset=dataset)
     if config.LLAVACAPTION.num_workers > 0:
         multiprocessing.set_start_method('spawn', force=True)
@@ -422,7 +521,7 @@ if __name__ == "__main__":
         captions = captioner.caption_dataset()
 
     # Create a parquet file that stores captions of all the images in the dataset
-    prompt_folder = "../waymo_data/training/"
+    #prompt_folder = "../waymo_data/training/"
 
     # save captions 
     # print('Writing Captions')
