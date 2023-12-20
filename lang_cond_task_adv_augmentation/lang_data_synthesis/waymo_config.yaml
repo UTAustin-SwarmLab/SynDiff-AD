@@ -19,7 +19,7 @@ IMAGE:
     #which camera frames to save
     SAVE_FRAMES: [0,1,2] #@param {type: "LIST"}
     SAVE_DATA: True
-    PALLETE: 'ade20k' # Choices: coco, ade20k, waymo 
+    PALLETE: 'coco' # Choices: coco, ade20k, waymo 
   BDD100k:
   
 control_net:
@@ -34,7 +34,7 @@ SAVE:
 SYNTHESIS_PARAMS:
   CONTROL : 1.0
   NUMSAMPLES : 2
-  GUESS : True
+  GUESS : False
   DETECT_RESOLUTION : 1024
   IMAGE_RESOLUTION: 512
   DDIMSTEPS : 30
@@ -43,7 +43,7 @@ SYNTHESIS_PARAMS:
   ETA: 0.00
   INIT_NOISE: 1.0
   ANNOTATOR: 'Seg_OFADE20K'
-  A_PROMPT: 'camera like photo, realistic textures, HD quality'
+  A_PROMPT: 'realistic textures, good quality'
   N_PROMPT: 'unrealistic, very sharp, disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality'
 LLAVACAPTION:
     MODELPATH: 'liuhaotian/llava-v1.5-13b'
@@ -51,11 +51,13 @@ LLAVACAPTION:
     NUM_IMAGES: 'ALL' # 'ALL' or int
     prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), lighting conditions and image quality. Don't mention the weather conditions or daytime."
     conv_mode: 'llava_v1'
-    batch_size: 16
+    batch_size: 2
     load_8bit: False
     load_4bit: True
-    num_workers: 6
-    conditions_path: 'waymo_open_data/'
+    num_workers: 2
+    conditions_path: 'waymo_open_data/waymo_env_conditions_train.csv'
+    captions_path_multi: 'waymo_open_data/waymo_captions_train_{}.csv'
+    captions_path_single: 'waymo_open_data/waymo_captions_train.csv'
     model_per_gpu: 2
 ROBUSTIFICATION:       
   test_conditions : [
@@ -75,10 +77,10 @@ ROBUSTIFICATION:
 SYN_DATASET_GEN:
   target_prob_soft: 0.001
   num_synthetic_images: 2500
-  dataset_path: '/store/harsh/data/waymo_synthetic/' # waymo_syntheitc_llava if use_llava_prompt is True
+  dataset_path: '/store/harsh/data/waymo_synthetic/' # waymo_syntheitc_nollava if use_llava_prompt is False
   segmentation: True
   conditions_path: 'waymo_open_data/'
-  use_llava_prompt: False
+  use_llava_prompt: True
   llava_prompt_path: 'waymo_open_data/'
   fid_results_path: 'lang_data_synthesis/synthesis_results/'
   fid_test_model: 'R50' # Swin-T or R50

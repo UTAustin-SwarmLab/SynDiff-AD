@@ -39,7 +39,9 @@ LLAVACAPTION:
     load_8bit: False
     load_4bit: True
     num_workers: 6
-    conditions_path: 'waymo_open_data/'
+    conditions_path: 'bdd100k/metadata_train_seg.csv'
+    captions_path_multi: 'bdd100k/seg_captions_train_{}.csv'
+    captions_path_single: 'bdd100k/waymo_captions_train.csv'
     model_per_gpu: 2
 ROBUSTIFICATION:       
   test_conditions : [
