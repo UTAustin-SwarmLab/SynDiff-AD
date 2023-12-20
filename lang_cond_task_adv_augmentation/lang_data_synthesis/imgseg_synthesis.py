@@ -181,7 +181,7 @@ def get_waymo(config):
                         validation=VALIDATION)
 
     # Obtain the image
-    np.random.seed(100000)
+    #np.random.seed(200)
     idx = np.random.randint(0, len(dataset))
     camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data = dataset[idx]
     
@@ -370,48 +370,51 @@ def post_process(invalid_mask, syn_img, gt_img):
     return syn_img
 
 if __name__ == "__main__":
-    config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
+    config = omegaconf.OmegaConf.load('lang_data_synthesis/waymo_config.yaml')
     synthesizer = ImageSynthesis(config)
    
     #img, seg_mask, object_keys = get_ade20k(config)
-    img, seg_mask, object_keys, mask = get_waymo(config)
-    if isinstance(object_keys, list):
-        prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
-        for key in object_keys:
-            if key != '-':
-                prompt_tokens['a_prompt'] += 'same {}, '.format(key)
-                prompt_tokens['n_prompt'] += 'missing {}, '.format(key)
-    else:
-        prompt_tokens = object_keys
-        
-    if config.GRADIO:
-        gradio_viz(title='control net test', 
-                synthesizer=synthesizer,
-                input_image=img.copy(), seg_mask = [seg_mask.copy()], 
-                server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090,
-                prompt_tokens=prompt_tokens)
-    else:
-        prompt = 'Rainy weather condition during nightime'
-        outputs = synthesizer.run_model(img.copy(), 
-                              seg_mask=[seg_mask.copy()],
-                              prompt = prompt,
-                              prompt_tokens=prompt_tokens)
-                
-        results = outputs[1:]
-        for j,syn_img in enumerate(results):
-            outputs[j+1] = post_process(mask, syn_img, img)
-        save_path = os.path.join(os.getcwd(), config.SAVE.PATH)
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        plt.figure(figsize=(10, 10))
-        plt.imshow(img)
-        plt.savefig(os.path.join(save_path, 'input.png'))
-        plt.close()
-        for i, output in enumerate(outputs):
+    for k in range(20):
+        seed = np.random.seed()
+        np.random.seed(seed)
+        img, seg_mask, object_keys, mask = get_waymo(config)
+        if isinstance(object_keys, list):
+            prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
+            for key in object_keys:
+                if key != '-':
+                    prompt_tokens['a_prompt'] += 'same {}, '.format(key)
+                    prompt_tokens['n_prompt'] += 'missing {}, '.format(key)
+        else:
+            prompt_tokens = object_keys
+            
+        if config.GRADIO:
+            gradio_viz(title='control net test', 
+                    synthesizer=synthesizer,
+                    input_image=img.copy(), seg_mask = [seg_mask.copy()], 
+                    server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090,
+                    prompt_tokens=prompt_tokens)
+        else:
+            prompt = 'Rainy weather condition during nightime'
+            outputs = synthesizer.run_model(img.copy(), 
+                                seg_mask=[seg_mask.copy()],
+                                prompt = prompt,
+                                prompt_tokens=prompt_tokens)
+                    
+            results = outputs[1:]
+            for j,syn_img in enumerate(results):
+                outputs[j+1] = post_process(mask, syn_img, img)
+            save_path = os.path.join(os.getcwd(), config.SAVE.PATH)
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
             plt.figure(figsize=(10, 10))
-            plt.imshow(output)
-            plt.savefig(os.path.join(save_path, 'output_{}.png'.format(i+1)))
+            plt.imshow(img)
+            plt.savefig(os.path.join(save_path, 'input_{}.png'.format(k)))
             plt.close()
+            for i, output in enumerate(outputs):
+                plt.figure(figsize=(10, 10))
+                plt.imshow(output)
+                plt.savefig(os.path.join(save_path, 'output_{}_{}.png'.format(k,i+1)))
+                plt.close()
                               
 # TODO: Modularization of this function is pending
 # DESIGN_DICT =  [{'type': 'image', 
