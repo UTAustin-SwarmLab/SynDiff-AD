@@ -60,10 +60,10 @@ ROBUSTIFICATION:
 SYN_DATASET_GEN:
   target_prob_soft: 0.001
   num_synthetic_images: 2500
-  dataset_path: '/store/harsh/data/waymo_synthetic/' # waymo_syntheitc_llava if use_llava_prompt is True
+  dataset_path: '/store/harsh/data/bdd_synthetic/' # waymo_syntheitc_llava if use_llava_prompt is True
   segmentation: True
-  conditions_path: 'waymo_open_data/'
+  conditions_path: 'bdd100k/'
   use_llava_prompt: False
-  llava_prompt_path: 'waymo_open_data/'
-  fid_results_path: 'lang_data_synthesis/synthesis_results/'
+  llava_prompt_path: 'bdd100k/metadata_val_seg.csv'
+  fid_results_path: 'lang_data_synthesis/synthesis_results_bdd/'
   fid_test_model: 'R50' # Swin-T or R50

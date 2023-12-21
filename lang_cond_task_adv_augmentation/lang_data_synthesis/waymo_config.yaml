@@ -81,6 +81,6 @@ SYN_DATASET_GEN:
   segmentation: True
   conditions_path: 'waymo_open_data/'
   use_llava_prompt: True
-  llava_prompt_path: 'waymo_open_data/'
+  llava_prompt_path: 'waymo_open_data/waymo_captions_train.csv'
   fid_results_path: 'lang_data_synthesis/synthesis_results/'
   fid_test_model: 'R50' # Swin-T or R50
