@@ -50,6 +50,7 @@ class MixedWaymoDatasetMM(WaymoDatasetMM):
             }
         )
         self.mixing_ratio = mixing_ratio
+        assert self.mixing_ratio < 1.0, "Mixing ratio should be less than 1.0"
         self.waymo_init(segmentation=segmentation,
                         validation=validation,
                         image_meta_data=image_meta_data)
@@ -220,12 +221,12 @@ class MixedWaymoDatasetMM(WaymoDatasetMM):
         img_path = os.path.join(self.waymo_config.DATASET_DIR, 
                                 'img', data_info['file_name'] + '.png')
         ann_path = os.path.join(self.waymo_config.DATASET_DIR,
-                                'mask', data_info['file_name'] + '.npy')
+                                'mask', data_info['file_name'] + '.png')
         
     
         camera_images = np.array(Image.open(img_path)).astype(np.uint8)
         if self.segmentation:
-            object_masks = np.load(ann_path).squeeze()
+            object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
             instance_masks = object_masks.copy()
             semantic_mask_rgb = self.get_semantic_mask(object_masks)
         else:
