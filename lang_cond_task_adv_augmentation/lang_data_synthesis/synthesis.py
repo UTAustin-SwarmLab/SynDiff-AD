@@ -13,12 +13,15 @@ from waymo_open_data import WaymoDataset
 import torch
 from copy import deepcopy
 from lang_data_synthesis.utils import write_to_csv_from_dict
-
+from argparse import ArgumentParser
+import tensorflow as tf
 # from mmseg.registry import DATASETS, TRANSFORMS, MODELS
 # from avcv.dataset.dataset_wrapper import *
 # from mmengine.registry import init_default_scope
 # from tqdm import tqdm
 # init_default_scope('mmseg')
+from bdd100k.data_loader import BDD100KDataset
+from PIL import Image
 
 class SyntheticAVGenerator:
     
@@ -42,7 +45,7 @@ class SyntheticAVGenerator:
             os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"img"))
             os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"mask"))
             
-        VAL_FILENAME = self.config.SYN_DATASET_GEN.conditions_path + "waymo_env_conditions_val.csv"
+        VAL_FILENAME = self.config.ROBUSTIFICATION.val_file_path
         
         if os.path.exists(VAL_FILENAME):
             self.metadata_conditions = pd.read_csv(VAL_FILENAME)
@@ -66,7 +69,7 @@ class SyntheticAVGenerator:
             raise Exception("File not found")
         
         # Replace meta data conditions with those in the training dataset
-        TRAIN_FILENAME = self.config.SYN_DATASET_GEN.conditions_path + "waymo_env_conditions_train.csv"
+        TRAIN_FILENAME = self.config.ROBUSTIFICATION.train_file_path
         if os.path.exists(TRAIN_FILENAME) and not self.dataset.validation:
             self.metadata_conditions = pd.read_csv(TRAIN_FILENAME)
             print(self.metadata_conditions.columns)
@@ -78,9 +81,9 @@ class SyntheticAVGenerator:
         
         if self.config.SYN_DATASET_GEN.segmentation:
             self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                              "metadata_seg.csv")
+                                              "metadata_seg_{}.csv".format(self.config.seed_offset))
             self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                       "filenames_seg.txt")
+                                       "filenames_seg_{}.txt".format(self.config.seed_offset))
         else:
             self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                               "metadata_det.csv")
@@ -94,8 +97,7 @@ class SyntheticAVGenerator:
         )
         self.prompt_df = None
         if self.config.SYN_DATASET_GEN.use_llava_prompt:
-            self.llavafilename = os.path.join(self.config.SYN_DATASET_GEN.llava_prompt_path,
-                                       "waymo_captions_train.csv")
+            self.llavafilename = os.path.join(self.config.SYN_DATASET_GEN.llava_prompt_path)
             self.prompt_df = pd.read_csv(self.llavafilename)
 
         # Load the model for synthesis
@@ -160,7 +162,7 @@ class SyntheticAVGenerator:
         '''
         
         for j in range(self.config.SYN_DATASET_GEN.num_synthetic_images):
-            np.random.seed(j*100)
+            np.random.seed(j*100 + self.config.seed_offset)
             # Sample a source conditions from the test conditions
             source_condition_idx= np.random.choice(np.arange(len(self.conditions)),
                                                 p=list(self.source_probability.values()))
@@ -191,11 +193,16 @@ class SyntheticAVGenerator:
                 cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                          "img",
                                          file_name +".png"), image)
-                
-                # Save the synthetic mask as a numpy array
-                np.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                #  save the synthetic mask
+                im = Image.fromarray(obj_mask)
+                im.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                      "mask",
-                                     file_name+".npy"), obj_mask)
+                                     file_name+".png"))
+                
+                # # Save the synthetic mask as a numpy array
+                # np.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                #                      "mask",
+                #                      file_name+".npy"), obj_mask)
                 
                 # Write the synthetic metadata with the target condition in a csv file
                 dict_data = {'filename':file_name, 'condition':target_condition}
@@ -212,16 +219,66 @@ class SyntheticAVGenerator:
                 with open(self.txtfilename, 'a') as f:
                     f.write(file_name+"\n")                
                 
-            
+def parse_args():
+    parser = ArgumentParser(description='Image Classification with CLIP')
+
+    parser.add_argument(
+        '--validation',
+        action='store_true',
+        default=False,
+        help='Use validation dataset')
+    parser.add_argument(
+        '--segmentation',
+        action='store_true',
+        default=False,
+        help='Enable it for the segmentation dataset')
+    parser.add_argument(
+        '--img_meta_data',
+        action = 'store_true',
+        default = False,
+        help = 'Enable it for the image meta data dataset')
+        
+    parser.add_argument(
+        '--experiment',
+        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        default='none',
+        help='Which experiment config to generate data for')
+    
+    parser.add_argument(
+        '--seed_offset',
+        type=int,
+        default=0,
+        help='Offset seed for random number generators')
+    return  parser.parse_args()
+      
 if __name__ == "__main__":
-    config = omegaconf.OmegaConf.load('lang_data_synthesis/config.yaml')
-    SEGMENTATION = config.SYN_DATASET_GEN.segmentation
+    args = parse_args()
+    
+    SEGMENTATION = args.segmentation
     IMAGE_META_DATA = True
     VALIDATION = False
-    dataset = WaymoDataset(config.IMAGE.WAYMO, 
-                image_meta_data=IMAGE_META_DATA,
-                segmentation=SEGMENTATION,
-                        validation=VALIDATION)
+    
+    tf.config.set_visible_devices([], 'GPU')
+    
+    config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
+    config = omegaconf.OmegaConf.load(config_file_name)
+    config.seed_offset = args.seed_offset
+    if args.experiment == 'waymo':
+        dataset = WaymoDataset(config.IMAGE.WAYMO, 
+                            image_meta_data=IMAGE_META_DATA,
+                            segmentation=SEGMENTATION,
+                            validation=VALIDATION)
+    elif args.experiment == 'bdd':
+        dataset = BDD100KDataset(config.IMAGE.BDD, 
+                            image_meta_data=IMAGE_META_DATA,
+                            segmentation=SEGMENTATION,
+                            validation=VALIDATION)
+    elif args.experiment == 'plan':
+        raise NotImplementedError
+    elif args.experiment == 'cliport':
+        raise NotImplementedError
+    else:
+        raise ValueError("Experiment not supported")
     dataset_gen = SyntheticAVGenerator(source_dataset=dataset,
                                        config=config)
     dataset_gen.generate_synthetic_dataset()
