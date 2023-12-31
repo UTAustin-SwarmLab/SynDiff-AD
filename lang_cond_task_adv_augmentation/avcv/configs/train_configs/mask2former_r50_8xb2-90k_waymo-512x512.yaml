@@ -2,7 +2,7 @@ model_name: 'mask2former_r50_8xb2-90k_waymo-512x512'
 model_config_path: 'avcv/configs/models/'
 load_model_paths: 'avcv/model_weights/mask2former_r50_8xb2-160k_ade20k-512x512_20221204_000055-2d1f55f1.pth'
 work_dir: '/store/harsh/work_dirs/'
-max_iters: 10000
-val_interval: 10000
+max_iters: 50000
+val_interval: 50000
 logger_interval: 5
-checkpoint_interval: 1000
+checkpoint_interval: 2500
