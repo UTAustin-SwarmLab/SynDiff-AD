@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/models/segformer_mit-b0.py', '../dataset/waymo_ds.py',
+    '../_base_/models/segformer_mit-b0.py', '../dataset/bdd_ds.py',
     '../default_runtime.py', '../_base_/schedules/schedule_160k.py'
 ]
 crop_size = (512, 512)
