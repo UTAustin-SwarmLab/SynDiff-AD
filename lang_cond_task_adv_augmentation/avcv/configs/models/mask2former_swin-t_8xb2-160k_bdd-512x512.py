@@ -1,4 +1,4 @@
-_base_ = ['mask2former_r50_8xb2-90k_waymo-512x512.py']
+_base_ = ['mask2former_r50_8xb2-90k_bdd-512x512.py']
 crop_size = (512, 512)
 data_preprocessor = dict(
     type='SegDataPreProcessor',
@@ -94,8 +94,8 @@ val_evaluator = dict(
         'mIoU',
     ], type='IoUMetric')
 train_dataloader = dict(
-    batch_size=3,
-    num_workers=3,
+    batch_size=4,
+    num_workers=4,
     dataset=dict(
     pipeline=train_pipeline,
     )

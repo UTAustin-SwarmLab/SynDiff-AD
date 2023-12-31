@@ -1,5 +1,5 @@
 _base_ = ['../default_runtime.py', 
-          '../dataset/mixed_waymo_ds.py']
+          '../dataset/bdd_ds.py']
 crop_size = (512, 512)
 data_preprocessor = dict(
     type='SegDataPreProcessor',
@@ -11,28 +11,6 @@ data_preprocessor = dict(
     size=crop_size,
     test_cfg=dict(size_divisor=32))
 num_classes = 29
-train_pipeline = [
-    dict(type='AVResize', scale=crop_size, keep_ratio=False),
-    dict(type='PackSegInputs', meta_keys=['context_name',
-                                          'context_frame',
-                                          'camera_id',
-                                          'ori_shape',
-                                          'img_shape',
-                                          'scale_factor',
-                                          'reduce_zero_label'])
-]
-test_pipeline = [
-    dict(type='AVResize', scale=crop_size, keep_ratio=False, test=True),
-    dict(type='PackSegInputs', meta_keys=['context_name',
-                                          'context_frame',
-                                          'camera_id',
-                                          'ori_shape',
-                                          'img_shape',
-                                          'scale_factor',
-                                          'reduce_zero_label'])
-]
-
-
 default_scope = 'mmseg'
 model = dict(
     type='EncoderDecoder',
@@ -159,19 +137,13 @@ model = dict(
 train_dataloader = dict(
     batch_size=3,
     num_workers=3,
-    dataset=dict(
-        pipeline=train_pipeline,
-        )
   )
 
 val_dataloader = dict(
-    batch_size=16,
-    num_workers=16,
-    dataset=dict(
-        pipeline=test_pipeline,
-        )
+    batch_size=3,
+    num_workers=3,
    )
-test_dataloader = val_dataloader
+
 # optimizer
 embed_multi = dict(lr_mult=1.0, decay_mult=0.0)
 optimizer = dict(

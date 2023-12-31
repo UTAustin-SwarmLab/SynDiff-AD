@@ -93,15 +93,7 @@ val_evaluator = dict(
     iou_metrics=[
         'mIoU',
     ], type='IoUMetric')
-vis_backends = [
-    dict(type='LocalVisBackend'),
-]
-visualizer = dict(
-    name='visualizer',
-    type='SegLocalVisualizer',
-    vis_backends=[
-        dict(type='LocalVisBackend'),
-    ])
+
 train_dataloader = dict(
     batch_size=4,
     num_workers=4,
