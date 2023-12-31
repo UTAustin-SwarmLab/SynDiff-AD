@@ -443,6 +443,12 @@ COCO_PALETTE = dict(
     'building-other-merged': [116, 112, 0],
     'rock-merged': [0, 114, 143],
     'wall-other-merged': [102, 102, 156],
-    'rug-merged': [250, 141, 255]   
+    'rug-merged': [250, 141, 255],
+    # ADE20K not supported but we use it for the extra classes as it supported by ControlNet
+    'road': [140, 140, 140],
+    'earth': [120, 120, 70],
+    'pole': [51, 0, 255],
+    # 'wall': [120, 120, 120],
+    # 'building': [180, 120, 120],
 }
 )
