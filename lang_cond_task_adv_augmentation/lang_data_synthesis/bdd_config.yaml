@@ -4,16 +4,18 @@ IMAGE:
     SYNTH_TRAIN_DIR: None # Always set in the sub programs
     TRAIN_META_PATH: 'bdd100k/'
     VAL_META_PATH: 'bdd100k/'
-    PALLETE: 'COCO' # COCO or BDD or ADE20K 
+    PALLETE: 'coco' # coco or bdd or ade20k
 control_net:
   CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
   MODEL_PATH: 'ControlNet/models/control_v11p_sd15_seg.pth'
+  FT_MODEL_PATH: 'ControlNet/models/control_v11p_sd15_av2.ckpt'
   SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
+  USE_FINETUNED: True
 SEGMENT_MODEL: 
   TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
 GRADIO: False
 SAVE:
-  PATH: 'lang_data_synthesis/test_results/'
+  PATH: 'lang_data_synthesis/test_results_bdd/'
 SYNTHESIS_PARAMS:
   SYNTH_TRAIN_DIR: None # Always set in the sub programs
   CONTROL : 1.0
@@ -41,7 +43,7 @@ LLAVACAPTION:
     num_workers: 6
     conditions_path: 'bdd100k/metadata_train_seg.csv'
     captions_path_multi: 'bdd100k/seg_captions_train_{}.csv'
-    captions_path_single: 'bdd100k/waymo_captions_train.csv'
+    captions_path_single: 'bdd100k/seg_captions_train.csv'
     model_per_gpu: 2
 ROBUSTIFICATION:       
   test_conditions : [
@@ -59,11 +61,12 @@ ROBUSTIFICATION:
   val_file_path : 'bdd100k/metadata_val_seg.csv'
 SYN_DATASET_GEN:
   target_prob_soft: 0.001
-  num_synthetic_images: 2500
+  num_synthetic_images: 5000
   dataset_path: '/store/harsh/data/bdd_synthetic/' # waymo_syntheitc_llava if use_llava_prompt is True
   segmentation: True
   conditions_path: 'bdd100k/'
   use_llava_prompt: False
-  llava_prompt_path: 'bdd100k/metadata_val_seg.csv'
+  llava_prompt_path: 'bdd100k/seg_captions_train.csv'
   fid_results_path: 'lang_data_synthesis/synthesis_results_bdd/'
   fid_test_model: 'R50' # Swin-T or R50
+  use_finetuned: False 
