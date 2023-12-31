@@ -40,6 +40,8 @@ from typing import *
 from lang_data_synthesis.utils import convert_pallette_segment
 # from ControlNet.annotator.uniformer.mmseg.datasets import ADE20KDataset
 from copy import copy
+from bdd100k.data_loader import BDD100KDataset
+from argparse import ArgumentParser
 
 def gradio_viz(
         title:str,
@@ -141,9 +143,13 @@ def get_ade20k(config):
     print("It is located at {}".format(full_file_name))
     print("It happens in a {}".format(index_ade20k['scene'][config.IMAGE.ADE20K.image_id]))
     print("It has {} objects, of which {} are parts".format(num_obj, num_parts))
-    print("The most common object is object {} ({}), which appears {} times".format(obj_name, obj_id, count_obj))
+    print("The most common object is object {} ({}), which \
+          appears {} times".format(obj_name, obj_id, count_obj))
 
-    info = utils_ade20k.loadAde20K('{}/{}'.format(config.IMAGE.ADE20K.DATASET_PATH, full_file_name))
+    info = utils_ade20k.loadAde20K('{}/{}'.format(
+        config.IMAGE.ADE20K.DATASET_PATH, 
+        full_file_name
+    ))
     img = cv2.imread(info['img_name'])[:,:,::-1]
     seg = cv2.imread(info['segm_name'])[:,:,::-1]
     object_mask = info['class_mask']
@@ -194,6 +200,29 @@ def get_waymo(config):
     invalid_mask = dataset.get_unmapped_mask(object_masks)
     return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask
 
+def get_bdd(config):
+    SEGMENTATION = True
+    IMAGE_META_DATA = True
+    VALIDATION = True
+    dataset = BDD100KDataset(config.IMAGE.BDD, 
+                image_meta_data=IMAGE_META_DATA,
+                segmentation=SEGMENTATION,
+                        validation=VALIDATION)
+
+    # Obtain the image
+    #np.random.seed(200)
+    idx = np.random.randint(0, len(dataset))
+    camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data = dataset[idx]
+    
+    # Obtain the segmentation mask
+    prompt_tokens = {}
+    prompt_tokens['a_prompt'] = "Must contain " + BDD100KDataset.get_text_description(object_masks, dataset.CLASSES)
+    prompt_tokens['n_prompt'] = "Must not contain " +  BDD100KDataset.get_text_description(object_masks, dataset.CLASSES)
+    
+    semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
+    invalid_mask = dataset.get_unmapped_mask(object_masks)
+    return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask
+
 class ImageSynthesis:
     
     def __init__(self, config) -> None:
@@ -201,9 +230,14 @@ class ImageSynthesis:
         self.initialize_model()
         
     def initialize_model(
-        self
+        self  
     ):
-        self.config.control_net.MODEL_PATH = os.path.join(os.getcwd(),
+        
+        if self.config.SYN_DATASET_GEN.use_finetuned:
+            self.config.control_net.MODEL_PATH = os.path.join(os.getcwd(),
+                                                    self.config.control_net.FT_MODEL_PATH)
+        else:
+            self.config.control_net.MODEL_PATH = os.path.join(os.getcwd(),
                                                     self.config.control_net.MODEL_PATH)
         self.config.control_net.CONFIG_PATH = os.path.join(os.getcwd(), 
                                                     self.config.control_net.CONFIG_PATH)
@@ -240,6 +274,7 @@ class ImageSynthesis:
         init_noise=0.2,
         seg_mask=None,
         prompt_tokens=None,
+        finetuned_control = False
         ):
         '''
         prompt_tokens : Dict of additional prompt tokens
@@ -263,7 +298,12 @@ class ImageSynthesis:
                 # uniformer_segmap = preprocessor(resize_image(input_image, detect_resolution))
                 detected_map = seg_mask[0].copy()
 
-            img = resize_image(input_image, image_resolution)
+            if finetuned_control:
+                img = cv2.resize(input_image, (image_resolution, image_resolution),
+                                 interpolation=cv2.INTER_AREA)
+            else:
+                img = resize_image(input_image, image_resolution)
+                
             H, W, C = img.shape
             
             detected_map = cv2.resize(detected_map, (W, H), interpolation=cv2.INTER_NEAREST)
@@ -357,7 +397,8 @@ class ImageSynthesis:
                     num_samples, image_resolution, detect_resolution,
                     ddim_steps, guess_mode, strength, scale, seed, eta,
                     init_noise=init_noise, det=annotator,
-                    seg_mask=seg_mask, prompt_tokens=prompt_tokens)
+                    seg_mask=seg_mask, prompt_tokens=prompt_tokens,
+                    finetuned_control=self.config.SYN_DATASET_GEN.use_finetuned)
 
         return outputs
 
@@ -369,15 +410,56 @@ def post_process(invalid_mask, syn_img, gt_img):
     syn_img[invalid_mask.squeeze()] = gt_img[invalid_mask.squeeze()]
     return syn_img
 
+def parse_args():
+    parser = ArgumentParser(description='Image Classification with CLIP')
+
+    parser.add_argument(
+        '--validation',
+        action='store_true',
+        default=False,
+        help='Use validation dataset')
+    parser.add_argument(
+        '--segmentation',
+        action='store_true',
+        default=False,
+        help='Enable it for the segmentation dataset')
+    parser.add_argument(
+        '--img_meta_data',
+        action = 'store_true',
+        default = False,
+        help = 'Enable it for the image meta data dataset')
+        
+    parser.add_argument(
+        '--experiment',
+        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        default='none',
+        help='Which experiment config to generate data for')
+    
+    parser.add_argument(
+        '--seed_offset',
+        type=int,
+        default=0,
+        help='Offset seed for random number generators')
+    return  parser.parse_args()
+
 if __name__ == "__main__":
-    config = omegaconf.OmegaConf.load('lang_data_synthesis/waymo_config.yaml')
+    
+    args = parse_args()
+    
+    config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
+    config = omegaconf.OmegaConf.load(config_file_name)
+    
     synthesizer = ImageSynthesis(config)
    
     #img, seg_mask, object_keys = get_ade20k(config)
     for k in range(20):
         seed = np.random.seed()
         np.random.seed(seed)
-        img, seg_mask, object_keys, mask = get_waymo(config)
+        if args.experiment == 'waymo':
+            img, seg_mask, object_keys, mask = get_waymo(config)
+        elif args.experiment == 'bdd':
+            img, seg_mask, object_keys, mask = get_bdd(config)
+            
         if isinstance(object_keys, list):
             prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
             for key in object_keys:
