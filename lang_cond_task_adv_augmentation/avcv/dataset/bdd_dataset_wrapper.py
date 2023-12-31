@@ -56,7 +56,8 @@ class BDDDatasetMM(BaseSegDataset):
                                       segmentation=segmentation,
                                       image_meta_data=image_meta_data,
                                       mixing_ratio=mixing_ratio)
-
+        self.segmentation = self.dataset.segmentation
+        
         self.METAINFO = dict(
             classes = self.dataset.CLASSES,
             palette = self.dataset.PALLETE
@@ -192,19 +193,7 @@ class BDDDatasetMM(BaseSegDataset):
             data_info['condition'] = condition
             return data_info
  
-    
-    def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
-        '''
-        Returns the semantic mask from the object mask
 
-        Args:
-            object_mask: The object mask to extract the semantic mask from
-        
-        Returns:
-            semantic_mask: The semantic mask of the object mask
-        '''
-        semantic_mask = self.color_map[object_mask.squeeze()]
-        return semantic_mask
         
     def prepare_data(self, idx) -> Any:
         """Get data processed by ``self.pipeline``.
