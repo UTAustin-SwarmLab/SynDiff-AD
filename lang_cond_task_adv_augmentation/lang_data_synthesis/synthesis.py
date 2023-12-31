@@ -22,6 +22,7 @@ import tensorflow as tf
 # init_default_scope('mmseg')
 from bdd100k.data_loader import BDD100KDataset
 from PIL import Image
+from lang_data_synthesis.dataset import ExpDataset
 
 class SyntheticAVGenerator:
     
@@ -115,19 +116,29 @@ class SyntheticAVGenerator:
            
         camera_images, _, _,\
         object_masks, img_data = self.dataset[source_idx]
+        
         prompt_tokens = {}
-        prompt_tokens['a_prompt'] = "Must contain " + WaymoDataset.get_text_description(object_masks, self.dataset.CLASSES)
+        prompt_tokens['a_prompt'] = "Must contain " + ExpDataset.get_text_description(object_masks,
+                                                                                        self.dataset.CLASSES)
         #prompt_tokens['n_prompt'] = "Must not contain " + self.dataset.get_text_description(object_masks)
         prompt_tokens['n_prompt'] = ""
         semantic_mapped_rgb_mask = self.dataset.get_mapped_semantic_mask(object_masks)
         invalid_mask = self.dataset.get_unmapped_mask(object_masks)
         weather, day = target_condition.split(',')
+        
         if self.config.SYN_DATASET_GEN.use_llava_prompt:
-            prompt = self.prompt_df.loc[
-                (img_data['context_name'] == self.prompt_df['context_name']) &
-                (img_data['context_frame'] == self.prompt_df['context_frame']) &
-                (img_data['camera_id'] == self.prompt_df['camera_id'])
-            ]['caption'].values[0]
+            
+            if 'context_name' in img_data.keys():
+                prompt = self.prompt_df.loc[
+                    (img_data['context_name'] == self.prompt_df['context_name']) &
+                    (img_data['context_frame'] == self.prompt_df['context_frame']) &
+                    (img_data['camera_id'] == self.prompt_df['camera_id'])
+                ]['caption'].values[0]
+            elif 'file_name' in img_data.keys():
+                prompt = self.prompt_df.loc[
+                    (img_data['file_name'] == self.prompt_df['context_name'])
+                ]['caption'].values[0]
+                
             source_condition = self.metadata_conditions.iloc[source_idx]['condition']
             source_weather, source_day = source_condition.split(',')
             
@@ -186,15 +197,25 @@ class SyntheticAVGenerator:
             
             # Save the synthetic image
             for i,image in enumerate(images):
-                file_name = str(img_data['context_name'])+"_"\
+                
+                if 'context_name' in img_data.keys():
+                    file_name = str(img_data['context_name'])+"_"\
                     +str(img_data['context_frame'])+"_"+\
                     str(img_data['camera_id'])+"_"+\
                     str(j)+"_"+str(i)
+                elif 'file_name' in img_data.keys():
+                   file_name = str(img_data['file_name'])+\
+                    "_"+ str(j)+"_"+str(i)
+                    
+                # file_name = str(img_data['context_name'])+"_"\
+                #     +str(img_data['context_frame'])+"_"+\
+                #     str(img_data['camera_id'])+"_"+\
+                #     str(j)+"_"+str(i)
                 cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                          "img",
                                          file_name +".png"), image)
                 #  save the synthetic mask
-                im = Image.fromarray(obj_mask)
+                im = Image.fromarray(obj_mask.astype(np.uint8).squeeze())
                 im.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                      "mask",
                                      file_name+".png"))
