@@ -332,20 +332,19 @@ class WaymoDataset(ExpDataset):
                             'sidewalk':'sidewalk',
                             'building':'building',
                             'road':'road',
-                            'traffic_light': 'traffic light',
+                            # 'traffic_light': 'traffic light',
                             'vegetation':'tree',
-                            'traffic sign':'signboard',
+                            #'sign':'signboard',
                             'sky':'sky',
                             'ground_animal':'animal',
-                            'pedestrian':'person',
+                            # 'pedestrian':'person',
                             'bus': 'bus', 
                             'wall': 'wall',
-                            'fence': 'fence',
-                            'pole': 'pole',
+                            # 'fence': 'fence',
+                            # 'pole': 'pole',
                             'car': 'car',
                             'truck': 'truck',
-                            'bicycle': 'bicycle',
-                            'bus'  : 'bus',
+                            #'bicycle': 'bicycle',
                             }
         self.UNMAPPED_CLASSES_ADE = set(self.CLASSES_TO_PALLETTE.keys())\
             - set(self.ADE_CLASS_MAPPING.keys())
@@ -353,28 +352,55 @@ class WaymoDataset(ExpDataset):
             
         self.COCO_CLASS_MAPPING = { 
                              'road':'road',
-                             'bus': 'bus',
-                             'train':'train',
-                             'truck': 'truck',
-                             'bicycle': 'bicycle',
-                             'sign': 'stop sign',
-                             'traffic_light': 'traffic light',
-                             'motorcycle':'motorcycle', 
+                             #'bus': 'bus',
+                             #'train':'train',
+                             #'truck': 'truck',
+                             #'bicycle': 'bicycle',
+                             #'sign': 'stop sign',
+                             #'traffic_light': 'traffic light',
+                             #'motorcycle':'motorcycle', 
                              'building': 'building-other-merged',
-                             'wall': 'wall-other-merged',
+                              'wall': 'wall-other-merged',
                              'fence': 'fence-merged',
                              'pedestrian': 'person',
                              'car': 'car',
                              'sky': 'sky-other-merged',
                              'vegetation': 'tree-merged',
-                             'motorcycle': 'motorcycle',
-                             'sidewalk': 'pavement-other-merged',
+                             'sidewalk': 'pavement-merged',
                              'bird': 'bird',
-                             'ground_animal':'dog'
+                             'ground_animal':'dog',
+                             'ground' : 'earth',
+                             'pole': 'pole',
                             }
+        
+        self.COCO_CLASS_FULL_MAPPING = { 
+                        'road':'road',
+                        'bus': 'bus',
+                        'train':'train',
+                        'truck': 'truck',
+                        'bicycle': 'bicycle',
+                        'sign': 'stop sign',
+                        'traffic_light': 'traffic light',
+                        'motorcycle':'motorcycle', 
+                        'building': 'building-other-merged',
+                        'wall': 'wall-other-merged',
+                        'fence': 'fence-merged',
+                        'pedestrian': 'person',
+                        'car': 'car',
+                        'sky': 'sky-other-merged',
+                        'vegetation': 'tree-merged',
+                        'sidewalk': 'pavement-merged',
+                        'bird': 'bird',
+                        'ground_animal':'dog',
+                        'ground' : 'earth',
+                        'pole': 'pole',
+                    }
         
         self.UNMAPPED_CLASSES_COCO = set(self.CLASSES_TO_PALLETTE.keys())\
             - set(self.COCO_CLASS_MAPPING.keys())
+        
+        self.UNMAPPED_CLASSES_COCO_FULL = set(self.CLASSES_TO_PALLETTE.keys())\
+        - set(self.COCO_CLASS_FULL_MAPPING.keys())
         
         self.UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE.intersection(
             self.UNMAPPED_CLASSES_COCO)
@@ -389,6 +415,10 @@ class WaymoDataset(ExpDataset):
         elif self.ds_config.PALLETE == "coco":
             UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_COCO
             MAPPED_CLASSES = self.COCO_CLASS_MAPPING
+            COLORS = COCO_PALETTE
+        elif self.ds_config.PALLETE == "cocofull":
+            UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_COCO_FULL
+            MAPPED_CLASSES = self.COCO_CLASS_FULL_MAPPING
             COLORS = COCO_PALETTE
         else:
             UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE
@@ -463,7 +493,8 @@ class WaymoDataset(ExpDataset):
 
         if index >= self._num_images:
             raise IndexError("Index out of range")
-
+        
+        data = self._data_list[index]
         # Find the appropriate index at which the image is stored
         # DEPRECIATED:
         # index_copy = index
@@ -498,10 +529,14 @@ class WaymoDataset(ExpDataset):
                
         #         break
         # Load all the frames from the context file
-
-        context_name = self._data_list[index]['context_name']
-        context_frame = self._data_list[index]['context_frame']
-        camera_id = self._data_list[index]['camera_id']
+        return self._load_item(data)
+    
+    def _load_item(self, data):
+        
+        context_name = data['context_name']
+        context_frame = data['context_frame']
+        camera_id = data['camera_id']
+    
         
         with tf.device('cpu'):
             if self.segmentation:
@@ -640,3 +675,5 @@ if __name__ == '__main__':
             print(data[0].shape)
         except:
             raise ValueError("The dataloader failed to load the data")
+
+
