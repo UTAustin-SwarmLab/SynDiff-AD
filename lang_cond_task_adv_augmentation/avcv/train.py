@@ -6,6 +6,7 @@ import os.path as osp
 import numpy as np
 
 from avcv.dataset.dataset_wrapper import WaymoDatasetMM, AVResize
+from avcv.dataset import *
 from avcv.dataset.synth_dataset_wrapper import SynthWaymoDatasetMM
 from avcv.dataset.mixed_dataset_wrapper import MixedWaymoDatasetMM
 from mmengine import Config
@@ -50,8 +51,7 @@ class AVTrain:
         # resume training
         cfg.resume = args.resume
 
-        # For fine-tuning 
-
+        
         # Load the pretrained weights
         if args.resume:
             loads = cfg.work_dir 
@@ -65,11 +65,7 @@ class AVTrain:
                         latest_iter = iter
                         latest_path = i
             cfg.load_from = osp.join(loads, latest_path)
-            
-        else:
-            cfg.load_from = train_config.load_model_paths 
-        
-        if 'synth' in train_config.model_name or 'mixed' in train_config.model_name:
+        elif 'synth' in train_config.model_name or 'mixed' in train_config.model_name:
             loads = train_config.work_dir + train_config.source_model + args.dir_tag
             latest_path = 0
             latest_iter = 0
@@ -81,10 +77,20 @@ class AVTrain:
                         latest_iter = iter
                         latest_path = i
             cfg.load_from = osp.join(loads, latest_path)
+        else:
+            cfg.load_from = train_config.load_model_paths 
+        
+
 
         # Set up working dir to save files and logs.
         cfg.train_cfg.max_iters = train_config.max_iters
         cfg.train_cfg.val_interval = train_config.val_interval
+        schedulers = []
+        for param_scheduler in cfg.param_scheduler:
+            param_scheduler.end = train_config.max_iters
+            schedulers.append(param_scheduler)
+        cfg.param_scheduler = schedulers
+            
         cfg.default_hooks.logger.interval = train_config.logger_interval
         cfg.default_hooks.checkpoint.interval = train_config.checkpoint_interval
 
@@ -121,7 +127,7 @@ def parse_args():
     )
     parser.add_argument(
         '--dir_tag',
-        default='v1',
+        default='v2',
         help='tag for new directory to save model'
     )
     
