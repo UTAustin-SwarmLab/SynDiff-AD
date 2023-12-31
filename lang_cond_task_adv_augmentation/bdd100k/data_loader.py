@@ -33,7 +33,7 @@ class BDD100KDataset(ExpDataset):
                  validation=False, 
                  segmentation=True,
                  image_meta_data=False,
-                 mixing_ratio = 1.0) -> None:
+                 mixing_ratio = 0.5) -> None:
  
 
         
@@ -141,37 +141,37 @@ class BDD100KDataset(ExpDataset):
         elif not validation:
             if segmentation:
                 if os.path.exists(os.path.join(self.bdd_config.VAL_META_PATH,
-                                                "metadata_val_seg.csv")):
+                                                "metadata_train_seg.csv")):
                     self.metadata_path = os.path.join(self.bdd_config.VAL_META_PATH,
-                                                "metadata_val_seg.csv")
+                                                "metadata_train_seg.csv")
                 self.contexts_path = os.path.join(self.bdd_config.TRAIN_META_PATH,
                                         "filenames_train_seg.txt")
             else:
                 if os.path.exists(os.path.join(self.bdd_config.VAL_META_PATH,
-                                                "metadata_val_det.csv")):
+                                                "metadata_train_det.csv")):
                     self.metadata_path = os.path.join(self.bdd_config.VAL_META_PATH,
-                                                "metadata_val_det.csv")
+                                                "metadata_train_det.csv")
                 self.contexts_path = os.path.join(self.bdd_config.TRAIN_META_PATH,
                                         "filenames_train_det.txt")
         
         self.metadata = None if self.metadata_path is None else pd.read_csv(self.metadata_path)
         self.init_pallete()
 
-        with open(self.contexts_path, 'r') as f:
-            
-            for line in f:
-                data_info = {
-                    'file_name': line.strip(),
-                }
-                if self.metadata is not None:
-                    data_info['condition'] = self.metadata[self.metadata['file_name'] == line.strip()]['condition'].values[0]
+        if self.mixing_ratio != 1.0: 
+            with open(self.contexts_path, 'r') as f:
+                
+                for line in f:
+                    data_info = {
+                        'file_name': line.strip(),
+                    }
+                    if self.metadata is not None:
+                        data_info['condition'] = self.metadata[self.metadata['file_name'] == line.strip()]['condition'].values[0]
 
-                self._data_list.append(data_info)
-                self._num_images+=1
+                    self._data_list.append(data_info)
+                    self._num_images+=1
 
-        if not validation and self.bdd_config.SYNTH_TRAIN_DIR != 'None':
-            self.synth_data_length = int(len(self._data_list)/(1 - self.mixing_ratio)) \
-                - len(self._data_list)
+        if not validation and self.bdd_config.SYNTH_TRAIN_DIR != 'None' and self.bdd_config.SYNTH_TRAIN_DIR is not None:
+
 
             if segmentation:
                 self.context_path_synth = os.path.join(self.bdd_config.SYNTH_TRAIN_DIR,
@@ -187,6 +187,12 @@ class BDD100KDataset(ExpDataset):
             added_images = 0
             self.metadata_synth = None if self.metadata_path_synth is None\
                 else pd.read_csv(self.metadata_path_synth)
+            if self.mixing_ratio != 1.0:
+                self.synth_data_length = int(len(self._data_list)/(1 - self.mixing_ratio)) \
+                - len(self._data_list)
+            else:
+                self.synth_data_length = self.metadata_synth.shape[0]
+
                 
             while added_images < self.synth_data_length:
                 with open(self.contexts_path_synth, 'r') as f:
@@ -276,11 +282,33 @@ class BDD100KDataset(ExpDataset):
                              'car': 'car',
                              'sky': 'sky-other-merged',
                              'vegetation': 'tree-merged',
-                             'sidewalk': 'pavement-other-merged'
+                             'sidewalk': 'pavement-merged'
                             }
+        
+        self.COCO_CLASS_FULL_MAPPING = { 
+                        'road':'road',
+                        'bus': 'bus',
+                        'train':'train',
+                        'truck': 'truck',
+                        'bicycle': 'bicycle',
+                        'traffic sign': 'stop sign',
+                        'traffic light': 'traffic light',
+                        'motorcycle':'motorcycle', 
+                        'building': 'building-other-merged',
+                        'wall': 'wall-other-merged',
+                        'fence': 'fence-merged',
+                        'person': 'person',
+                        'car': 'car',
+                        'sky': 'sky-other-merged',
+                        'vegetation': 'tree-merged',
+                        'sidewalk': 'pavement-merged'
+                    }
         
         self.UNMAPPED_CLASSES_COCO = set(self.CLASSES_TO_PALLETTE.keys())\
         - set(self.COCO_CLASS_MAPPING.keys())
+        
+        self.UNMAPPED_CLASSES_COCO_FULL = set(self.CLASSES_TO_PALLETTE.keys())\
+        - set(self.COCO_CLASS_FULL_MAPPING.keys())
         
         self.UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE.intersection(
             self.UNMAPPED_CLASSES_COCO)
@@ -295,6 +323,10 @@ class BDD100KDataset(ExpDataset):
         elif self.bdd_config.PALLETE == "coco":
             UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_COCO
             MAPPED_CLASSES = self.COCO_CLASS_MAPPING
+            COLORS = COCO_PALETTE
+        elif self.bdd_config.PALLETE == "cocofull":
+            UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_COCO_FULL
+            MAPPED_CLASSES = self.COCO_CLASS_FULL_MAPPING
             COLORS = COCO_PALETTE
         else:
             UNMAPPED_CLASSES = self.UNMAPPED_CLASSES_ADE
@@ -316,31 +348,8 @@ class BDD100KDataset(ExpDataset):
             list(self.CLASSES_TO_PALLETE_SYNTHETIC.values()))\
                 .astype(np.uint8)  
     
-
-    def __getitem__(
-            self, 
-            index:int
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict]:
-        '''
-        Returns an item from the dataset referenced by index
-
-        Args:
-            index: The index of the item to return
-        Returns:
-            camera_images: The camera images
-            semantic_mask_rgb: The semantic mask in rgb format
-            instance_masks: The instance masks
-            object_masks: The object masks
-            img_data (dict): The image data
-        '''
-        
-        # object_masks = self.get_object_class(semantic_masks)
-
-        if index >= self._num_images:
-            raise IndexError("Index out of range")
-
-        data = self._data_list[index]
-        
+    def _load_item(self, data:dict) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict]:
+       
         if 'condition' in data.keys():
             condition = data['condition']
             
@@ -373,4 +382,31 @@ class BDD100KDataset(ExpDataset):
                 return camera_images, box_classes, bounding_boxes, img_data
             else:
                 return camera_images, box_classes, bounding_boxes
+    
+    def __getitem__(
+            self, 
+            index:int
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict]:
+        '''
+        Returns an item from the dataset referenced by index
+
+        Args:
+            index: The index of the item to return
+        Returns:
+            camera_images: The camera images
+            semantic_mask_rgb: The semantic mask in rgb format
+            instance_masks: The instance masks
+            object_masks: The object masks
+            img_data (dict): The image data
+        '''
+        
+        # object_masks = self.get_object_class(semantic_masks)
+
+        if index >= self._num_images:
+            raise IndexError("Index out of range")
+
+        data = self._data_list[index]
+        
+        return self._load_item(data)
+        
     
