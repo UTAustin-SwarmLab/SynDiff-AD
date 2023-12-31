@@ -16,10 +16,12 @@ import omegaconf
 
 from mmseg.registry import DATASETS, TRANSFORMS, MODELS
 from avcv.dataset.dataset_wrapper import *
+from avcv.dataset import *
 from avcv.dataset.synth_dataset_wrapper import SynthWaymoDatasetMM
 from mmengine.registry import init_default_scope
 from mmseg.models.data_preprocessor import SegDataPreProcessor
 from tqdm import tqdm
+from argparse import ArgumentParser
 from mmengine.runner.checkpoint import _load_checkpoint, _load_checkpoint_to_model
 init_default_scope('mmseg')
 
@@ -217,27 +219,50 @@ class EvaluateSynthesisFID:
         #     size=[512,512],
         #     test_cfg=dict(size_divisor=32)
         # )
-        
-        self.real_data = WaymoDatasetMM(
-            data_config=dict(
-                TRAIN_DIR = self.config.IMAGE.WAYMO.TRAIN_DIR , 
-                EVAL_DIR =  self.config.IMAGE.WAYMO.EVAL_DIR,
-                TEST_SET_SOURCE = self.config.IMAGE.WAYMO.TEST_SET_SOURCE,
-                SAVE_FRAMES = [0,1,2]),
-            pipeline=[
-                dict(type='AVResize', scale=[512,512], keep_ratio=False),
-                dict(type='PackSegInputs', meta_keys=['context_name',
-                                                    'context_frame',
-                                                    'camera_id',
-                                                    'ori_shape',
-                                                    'img_shape',
-                                                    'scale_factor',
-                                                    'reduce_zero_label'])],
-                validation=False,
-                segmentation=True,
-                image_meta_data=True,
-                serialize_data=True
-        )
+        if self.config.experiment == 'waymo':
+            self.real_data = WaymoDatasetMM(
+                data_config=dict(
+                    TRAIN_DIR = self.config.IMAGE.WAYMO.TRAIN_DIR , 
+                    EVAL_DIR =  self.config.IMAGE.WAYMO.EVAL_DIR,
+                    TEST_SET_SOURCE = self.config.IMAGE.WAYMO.TEST_SET_SOURCE,
+                    SAVE_FRAMES = [0,1,2]),
+                pipeline=[
+                    dict(type='AVResize', scale=[512,512], keep_ratio=False),
+                    dict(type='PackSegInputs', meta_keys=['context_name',
+                                                        'context_frame',
+                                                        'camera_id',
+                                                        'ori_shape',
+                                                        'img_shape',
+                                                        'scale_factor',
+                                                        'reduce_zero_label'])],
+                    validation=False,
+                    segmentation=True,
+                    image_meta_data=True,
+                    serialize_data=True
+            )
+        elif self.config.experiment == 'bdd':
+            self.real_data = BDDDatasetMM(
+                data_config=dict(
+                    DATASET_DIR = self.config.IMAGE.BDD.DATASET_DIR, 
+                    SYNTH_TRAIN_DIR = None, # Always set in the sub programs
+                    TRAIN_META_PATH = self.config.IMAGE.BDD.TRAIN_META_PATH ,
+                    VAL_META_PATH = self.config.IMAGE.BDD.VAL_META_PATH,
+                    PALLETE = self.config.IMAGE.BDD.PALLETE),
+                pipeline=[
+                    dict(type='AVResize', scale=[512,512], keep_ratio=False),
+                    dict(type='PackSegInputs', meta_keys=['context_name',
+                                                        'context_frame',
+                                                        'camera_id',
+                                                        'ori_shape',
+                                                        'img_shape',
+                                                        'scale_factor',
+                                                        'reduce_zero_label'])],
+                    validation=False,
+                    segmentation=True,
+                    image_meta_data=True,
+                    serialize_data=True,
+                    mixing_ratio=0.0
+            )
         
         self.real_data_loader = torch.utils.data.DataLoader(
             self.real_data,
@@ -248,22 +273,47 @@ class EvaluateSynthesisFID:
             collate_fn=collate_fn
         )
         # Create per_class FID metrics and full dataset FID metric
-        self.fake_data = SynthWaymoDatasetMM(
-            data_config=dict(
-                DATASET_DIR = self.config.SYN_DATASET_GEN.dataset_path,
-            ),
-            pipeline=[
-                dict(type='AVResize', scale=[512,512], keep_ratio=False),
-                dict(type='PackSegInputs', meta_keys=['file_name',
-                                                    'ori_shape',
-                                                    'img_shape',
-                                                    'scale_factor',
-                                                    'reduce_zero_label'])],
-                validation=False,
-                segmentation=True,
-                image_meta_data=True,
-                serialize_data=True
-        )
+        if self.config.experiment == 'waymo':
+            self.fake_data = SynthWaymoDatasetMM(
+                data_config=dict(
+                    DATASET_DIR = self.config.SYN_DATASET_GEN.dataset_path,
+                ),
+                pipeline=[
+                    dict(type='AVResize', scale=[512,512], keep_ratio=False),
+                    dict(type='PackSegInputs', meta_keys=['file_name',
+                                                        'ori_shape',
+                                                        'img_shape',
+                                                        'scale_factor',
+                                                        'reduce_zero_label'])],
+                    validation=False,
+                    segmentation=True,
+                    image_meta_data=True,
+                    serialize_data=True
+            )
+        elif self.config.experiment == 'bdd':
+            self.fake_data = BDDDatasetMM(
+                data_config=dict(
+                    DATASET_DIR = self.config.IMAGE.BDD.DATASET_DIR, 
+                    SYNTH_TRAIN_DIR = self.config.SYN_DATASET_GEN.dataset_path,
+                    TRAIN_META_PATH = self.config.IMAGE.BDD.TRAIN_META_PATH ,
+                    VAL_META_PATH = self.config.IMAGE.BDD.VAL_META_PATH,
+                    PALLETE = self.config.IMAGE.BDD.PALLETE),
+                pipeline=[
+                    dict(type='AVResize', scale=[512,512], keep_ratio=False),
+                    dict(type='PackSegInputs', meta_keys=['context_name',
+                                                        'context_frame',
+                                                        'camera_id',
+                                                        'ori_shape',
+                                                        'img_shape',
+                                                        'scale_factor',
+                                                        'reduce_zero_label'])],
+                    validation=False,
+                    segmentation=True,
+                    image_meta_data=True,
+                    serialize_data=True,
+                    mixing_ratio=1.0
+            )
+        
         self.fake_data_loader = torch.utils.data.DataLoader(
             self.fake_data,
             batch_size=16,
@@ -294,7 +344,7 @@ class EvaluateSynthesisFID:
         
         # Initialize per class FID metrics
         self.fid_dict = {}
-        TRAIN_FILENAME = self.config.SYN_DATASET_GEN.conditions_path + "waymo_env_conditions_train.csv"
+        TRAIN_FILENAME = self.config.ROBUSTIFICATION.train_file_path
         if os.path.exists(TRAIN_FILENAME):
             self.real_metadata_conditions = pd.read_csv(TRAIN_FILENAME)
             self.conditions = self.real_metadata_conditions['condition'].unique()
@@ -320,7 +370,6 @@ class EvaluateSynthesisFID:
                 images = data['inputs']
                 data_samples = data['data_samples']
                 # Extract features from the real data
-                
                 real_features = self.feature_extractor(images)
                 N, C, H, W = real_features[-1].shape
                 if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
@@ -382,10 +431,47 @@ class EvaluateSynthesisFID:
             "_"+self.config.SYN_DATASET_GEN.fid_test_model + ".json"
             
             json.dump(fid_scores, open(path, 'w'))
-            
-            
+
+
+          
+def parse_args():
+    parser = ArgumentParser(description='Image Classification with CLIP')
+
+    parser.add_argument(
+        '--validation',
+        action='store_true',
+        default=False,
+        help='Use validation dataset')
+    parser.add_argument(
+        '--segmentation',
+        action='store_true',
+        default=False,
+        help='Enable it for the segmentation dataset')
+    parser.add_argument(
+        '--img_meta_data',
+        action = 'store_true',
+        default = False,
+        help = 'Enable it for the image meta data dataset')
+        
+    parser.add_argument(
+        '--experiment',
+        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        default='none',
+        help='Which experiment config to generate data for')
+    
+    parser.add_argument(
+        '--seed_offset',
+        type=int,
+        default=0,
+        help='Offset seed for random number generators')
+    return  parser.parse_args()
+
+   
 if __name__ == "__main__":
-    config = omegaconf.OmegaConf.load("lang_data_synthesis/config.yaml")
+    args = parse_args()
+    config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
+    config = omegaconf.OmegaConf.load(config_file_name)
+    config.experiment = args.experiment
     
     if torch.cuda.is_available():
         with torch.cuda.device(0):
