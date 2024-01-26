@@ -1,9 +1,9 @@
-model_name: 'mask2former_swin-t_8xb2-160k_mixedwaymo-512x512'
+model_name: 'mask2former_swin-t_8xb2-160k_mixedbdd-512x512'
 model_config_path: 'avcv/configs/models/'
 load_model_paths: '/home/hg22723/projects/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation/avcv/model_weights/mask2former_swin-t_8xb2-160k_ade20k-512x512_20221203_234230-7d64e5dd.pth'
 work_dir: '/store/harsh/work_dirs/'
-source_model: 'mask2former_swin-t_8xb2-160k_waymo-512x512'
-max_iters: 120000
-val_interval: 120000
+source_model: 'mask2former_swin-t_8xb2-160k_bdd-512x512'
+max_iters: 100000
+val_interval: 100000
 logger_interval: 5
-checkpoint_interval: 10000
+checkpoint_interval: 25000
