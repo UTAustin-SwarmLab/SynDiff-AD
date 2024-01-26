@@ -12,27 +12,20 @@ model = dict(
 
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
-    dict(type='PackSegInputs', meta_keys=['context_name',
-                                          'context_frame',
-                                          'camera_id',
+    dict(type='PackSegInputs', meta_keys=['file_name',
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
-                                          'condition',
                                           'reduce_zero_label'])
 ]
 test_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False, test=True),
-    dict(type='PackSegInputs', meta_keys=['context_name',
-                                          'context_frame',
-                                          'camera_id',
+    dict(type='PackSegInputs', meta_keys=['file_name',
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
-                                          'condition',
                                           'reduce_zero_label'])
-]
-
+]                                   
 optim_wrapper = dict(
     _delete_=True,
     type='OptimWrapper',
@@ -60,8 +53,8 @@ param_scheduler = [
 
 
 train_dataloader = dict(
-    batch_size=2,
-    num_workers=2,
+    batch_size=4,
+    num_workers=4,
     dataset=dict(
         pipeline=train_pipeline,
         )
