@@ -32,7 +32,9 @@ class ConditionAVTester:
     
         self.test_config = test_config
         
-        if 'synth' in test_config.model_name or 'mixed' in test_config.model_name:
+        if 'synth' in test_config.model_name \
+            or 'mixed' in test_config.model_name \
+                or 'ft' in test_config.model_name:
             model_config_path = test_config.model_config_path + test_config.source_model + '.py'
         else:
             model_config_path = test_config.model_config_path + test_config.model_name + '.py'
@@ -76,7 +78,10 @@ class ConditionAVTester:
 
         # TODO: Load the dataset stuff
 
-        FILENAME = self.test_config.waymo_data_path + "waymo_env_conditions_val.csv"
+        if 'bdd' in test_config.model_name:
+            FILENAME = self.test_config.data_path + "metadata_val_seg.csv"
+        elif 'waymo' in test_config.model_name:
+            FILENAME = self.test_config.data_path + "waymo_env_conditions_val.csv"
 
         if os.path.exists(FILENAME):
             self.metadata_conditions = pd.read_csv(FILENAME)
@@ -89,12 +94,18 @@ class ConditionAVTester:
         self.engine.load_or_resume()
         self.cfg = cfg
         
-        data_dict = {
-            "context_name":"context_name",
-            "context_frame":"context_frame",
-            "camera_id":"camera_id",
-            "condition":"condition"
-        }
+        if 'bdd' in test_config.model_name:
+             data_dict = {
+                "file_name":"file_name",
+                "condition":"condition"
+            }
+        elif 'waymo' in test_config.model_name:
+            data_dict = {
+                "context_name":"context_name",
+                "context_frame":"context_frame",
+                "camera_id":"camera_id",
+                "condition":"condition"
+            }
         for metric in self.engine.test_evaluator.metrics:
             data_dict[metric.metrics[0]+'_intersect'] = metric.metrics[0]+'_intersect'
             data_dict[metric.metrics[0]+'_union'] = metric.metrics[0]+'_union'
@@ -135,25 +146,38 @@ class ConditionAVTester:
                 
                 # Obtain the condition from the dataset
                 for j,sample in enumerate(data_batch['data_samples']):
-                    context_name = sample.context_name
-                    context_frame = sample.context_frame
-                    camera_id = sample.camera_id
-                    
-                    condition = self.metadata_conditions.loc[(self.metadata_conditions['context_name'] == context_name) & \
-                        (self.metadata_conditions['context_frame'] == context_frame) & \
-                        (self.metadata_conditions['camera_id'] == camera_id)].condition.values[0]
+
                     
                     # weather = condition.split(',')[-1]
                     # condition = sample.condition
                     # time = condition.split(',')[-1]
                     # condition = weather + ',' + time
                     
-                    data_dict = {
-                        'context_name':context_name,
-                        'context_frame':context_frame,
-                        'camera_id':camera_id,
-                        'condition':condition 
-                    }
+                    if 'bdd' in self.test_config.model_name:
+                        print(sample.keys())
+                        file_name = sample.file_name
+                        
+                        condition = self.metadata_conditions.loc[(
+                            self.metadata_conditions['file_name'] == file_name)].condition.values[0]
+                        data_dict = {
+                            'file_name':sample.file_name,
+                            'condition':condition 
+                        }
+                    elif 'waymo' in self.test_config.model_name:
+                        context_name = sample.context_name
+                        context_frame = sample.context_frame
+                        camera_id = sample.camera_id
+                        
+                        condition = self.metadata_conditions.loc[(self.metadata_conditions['context_name'] == context_name) & \
+                            (self.metadata_conditions['context_frame'] == context_frame) & \
+                            (self.metadata_conditions['camera_id'] == camera_id)].condition.values[0]
+                        
+                        data_dict = {
+                            'context_name':context_name,
+                            'context_frame':context_frame,
+                            'camera_id':camera_id,
+                            'condition':condition 
+                        }
                     
                     for metric in evaluator.metrics:
                         results = [[to_numpy(a) for a in metric.results[j]]]
@@ -231,12 +255,12 @@ def parse_args():
         help='job launcher')
     parser.add_argument(
         '--config_name',
-        default='mask2former_r50_8xb2-90k_waymo-512x512',
+        default='segformer_mit-b3_8xb2-160k_bdd-512x512',
         help='train config in configs/test_configs/'
     )
     parser.add_argument(
         '--dir_tag',
-        default='',
+        default='v1',
         help='tag for new directory to save model'
     )
     # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`

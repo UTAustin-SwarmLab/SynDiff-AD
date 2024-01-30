@@ -127,7 +127,7 @@ def parse_args():
     )
     parser.add_argument(
         '--dir_tag',
-        default='v2',
+        default='v3',
         help='tag for new directory to save model'
     )
     
