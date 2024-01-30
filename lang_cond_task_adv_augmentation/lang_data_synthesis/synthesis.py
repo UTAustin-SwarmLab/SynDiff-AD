@@ -134,19 +134,27 @@ class SyntheticAVGenerator:
                     (img_data['context_frame'] == self.prompt_df['context_frame']) &
                     (img_data['camera_id'] == self.prompt_df['camera_id'])
                 ]['caption'].values[0]
+                source_condition = self.metadata_conditions.loc[
+                    (img_data['context_name'] == self.metadata_conditions['context_name']) &
+                    (img_data['context_frame'] == self.metadata_conditions['context_frame']) &
+                    (img_data['camera_id'] == self.metadata_conditions['camera_id'])
+                ]['condition'].values[0]
             elif 'file_name' in img_data.keys():
                 prompt = self.prompt_df.loc[
                     (img_data['file_name'] == self.prompt_df['context_name'])
                 ]['caption'].values[0]
+                source_condition = self.metadata_conditions.loc[
+                    (img_data['file_name'] == self.metadata_conditions['context_name'])
+                ]['condition'].values[0]
                 
-            source_condition = self.metadata_conditions.iloc[source_idx]['condition']
+            #source_condition = self.metadata_conditions.iloc[source_idx]['condition']
             source_weather, source_day = source_condition.split(',')
             
             prompt = prompt.replace(source_weather, weather)
             prompt = prompt.replace(source_day, day)
             
         else:
-            prompt = ' A camera image taken during {} weather conditions during {} time'.format(weather, day)
+            prompt = 'This image is taken during {} time of the day and features {} weather. '.format(day, weather)
         with torch.no_grad():
             outputs = self.synthesizer.run_model(camera_images.copy(), 
                                 seg_mask=[semantic_mapped_rgb_mask.copy()],
@@ -158,7 +166,8 @@ class SyntheticAVGenerator:
             syn_img = cv2.resize(syn_img, (camera_images.shape[1],
                                            camera_images.shape[0]), 
                                  interpolation=cv2.INTER_NEAREST)
-            syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
+            if not self.config.SYN_DATASET_GEN.use_finetuned:
+                syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
             outputs[j+1] = syn_img
         
         # Return the synthetic image, object mask 
@@ -268,7 +277,7 @@ def parse_args():
     parser.add_argument(
         '--seed_offset',
         type=int,
-        default=0,
+        default=2000,
         help='Offset seed for random number generators')
     return  parser.parse_args()
       

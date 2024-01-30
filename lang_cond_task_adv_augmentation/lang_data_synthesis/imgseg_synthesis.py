@@ -26,6 +26,7 @@ import numpy as np
 import torch
 import random
 
+
 from pytorch_lightning import seed_everything
 from ControlNet.annotator.util import resize_image, HWC3
 # from ControlNet.annotator.uniformer import UniformerDetector
@@ -42,7 +43,7 @@ from lang_data_synthesis.utils import convert_pallette_segment
 from copy import copy
 from bdd100k.data_loader import BDD100KDataset
 from argparse import ArgumentParser
-
+import pandas as pd
 def gradio_viz(
         title:str,
         design_list:List[Dict]=None,
@@ -186,6 +187,10 @@ def get_waymo(config):
                 segmentation=SEGMENTATION,
                         validation=VALIDATION)
 
+    if config.SYN_DATASET_GEN.use_llava_prompt:
+        llavafilename = os.path.join(config.SYN_DATASET_GEN.llava_prompt_path)
+        prompt_df = pd.read_csv(llavafilename)
+        metadata_conditions = pd.read_csv(config.ROBUSTIFICATION.train_file_path)
     # Obtain the image
     #np.random.seed(200)
     idx = np.random.randint(0, len(dataset))
@@ -195,20 +200,42 @@ def get_waymo(config):
     prompt_tokens = {}
     prompt_tokens['a_prompt'] = "Must contain " + WaymoDataset.get_text_description(object_masks, dataset.CLASSES)
     prompt_tokens['n_prompt'] = "Must not contain " +  WaymoDataset.get_text_description(object_masks, dataset.CLASSES)
-    
+    prompt = None
+    source_condition = None
+    if prompt_df is not None:
+        if 'context_name' in img_data.keys():
+            prompt = prompt_df.loc[
+                        (img_data['context_name'] == prompt_df['context_name']) &
+                        (img_data['context_frame'] == prompt_df['context_frame']) &
+                        (img_data['camera_id'] == prompt_df['camera_id'])
+            ]['caption'].values[0]
+            source_condition = metadata_conditions.loc[
+                    (img_data['context_name'] == metadata_conditions['context_name']) &
+                    (img_data['context_frame'] == metadata_conditions['context_frame']) &
+                    (img_data['camera_id'] == metadata_conditions['camera_id'])
+                ]['condition'].values[0]
+                    
+        
     semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
     invalid_mask = dataset.get_unmapped_mask(object_masks)
-    return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask
+    return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask, prompt, source_condition
 
 def get_bdd(config):
     SEGMENTATION = True
     IMAGE_META_DATA = True
     VALIDATION = True
+    
     dataset = BDD100KDataset(config.IMAGE.BDD, 
                 image_meta_data=IMAGE_META_DATA,
                 segmentation=SEGMENTATION,
                         validation=VALIDATION)
 
+    prompt_df = None
+    if config.SYN_DATASET_GEN.use_llava_prompt:
+        llavafilename = os.path.join(config.SYN_DATASET_GEN.llava_prompt_path)
+        prompt_df = pd.read_csv(llavafilename)
+        metadata_conditions = pd.read_csv(config.ROBUSTIFICATION.train_file_path)
+        
     # Obtain the image
     #np.random.seed(200)
     idx = np.random.randint(0, len(dataset))
@@ -221,7 +248,16 @@ def get_bdd(config):
     
     semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
     invalid_mask = dataset.get_unmapped_mask(object_masks)
-    return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask
+    prompt = None
+    source_condition = None
+    if prompt_df is not None:
+        prompt = prompt_df.loc[
+                    (img_data['file_name'] == prompt_df['context_name'])
+                ]['caption'].values[0]
+        source_condition = metadata_conditions.loc[
+                    (img_data['file_name'] == metadata_conditions['context_name'])
+                ]['condition'].values[0]
+    return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask, prompt, source_condition
 
 class ImageSynthesis:
     
@@ -456,9 +492,9 @@ if __name__ == "__main__":
         seed = np.random.seed()
         np.random.seed(seed)
         if args.experiment == 'waymo':
-            img, seg_mask, object_keys, mask = get_waymo(config)
+            img, seg_mask, object_keys, mask, prompt, weather = get_waymo(config)
         elif args.experiment == 'bdd':
-            img, seg_mask, object_keys, mask = get_bdd(config)
+            img, seg_mask, object_keys, mask, prompt, weather = get_bdd(config)
             
         if isinstance(object_keys, list):
             prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
@@ -476,15 +512,24 @@ if __name__ == "__main__":
                     server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090,
                     prompt_tokens=prompt_tokens)
         else:
-            prompt = 'Rainy weather condition during nightime'
+            if prompt is None:
+                prompt = 'Rainy weather condition during nightime'
+            else:
+                prompt = prompt.replace(source_weather, weather)
+                prompt = prompt.replace(source_day, day)
             outputs = synthesizer.run_model(img.copy(), 
                                 seg_mask=[seg_mask.copy()],
                                 prompt = prompt,
                                 prompt_tokens=prompt_tokens)
                     
             results = outputs[1:]
-            for j,syn_img in enumerate(results):
-                outputs[j+1] = post_process(mask, syn_img, img)
+            for j,syn_img in enumerate(results):            
+                syn_img = cv2.resize(syn_img, (img.shape[1],
+                                           img.shape[0]), 
+                                 interpolation=cv2.INTER_NEAREST)
+                outputs[j+1] = syn_img
+            
+            #     outputs[j+1] = post_process(mask, syn_img, img)
             save_path = os.path.join(os.getcwd(), config.SAVE.PATH)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
