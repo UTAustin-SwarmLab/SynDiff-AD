@@ -1,4 +1,4 @@
-_base_ = ['mask2former_r50_8xb2-90k_mixedbdd-512x512.py']
+_base_ = ['mask2former_r50_8xb2-90k_mixedbddft-512x512.py']
 crop_size = (512, 512)
 data_preprocessor = dict(
     type='SegDataPreProcessor',
