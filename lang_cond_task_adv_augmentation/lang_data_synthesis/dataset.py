@@ -138,15 +138,21 @@ class AVControlNetDataset(ExpDataset):
     def __init__(self, config_dict,
                 image_meta_data=True,
                 segmentation=True,
-                validation=False) -> None:
+                validation=False,
+                rare_class_module = False) -> None:
         super().__init__()
         
         # We would write an init for both the waymo and the nuscenes datasets
+        # rare_class_module is a boolean that determines whether we want to use the rare class module or not
+        # this enables us to select the rare meta data conditions from the dataset with equal probability
         
         self.dataset = dict()
         self.prompt_df = dict()
         self.image_meta_data = image_meta_data
         self.config_dict = config_dict
+        self.condition_meta_data = dict()
+        self.rare_class_module = rare_class_module
+        self.conditions_list = []
         for dataset, cfg in config_dict.items():
             if dataset == 'waymo':
                 from waymo_open_data.data_loader import WaymoDataset
@@ -163,21 +169,51 @@ class AVControlNetDataset(ExpDataset):
             else:
                 raise ValueError(f'Invalid dataset {dataset}')
             
+            self.condition_meta_data[dataset] = pd.read_csv(cfg.ROBUSTIFICATION.train_file_path)
             prompt_file = os.path.join(cfg.SYN_DATASET_GEN.llava_prompt_path)
             self.prompt_df[dataset] = pd.read_csv(prompt_file)
+            self.conditions_list.extend(self.condition_meta_data[dataset]['condition'].unique().tolist())
         
+        self.conditions_list = list(set(self.conditions_list))
         self._num_images = sum([len(ds) for ds in self.dataset.values()])
             
         self.av_init()
             
     def av_init(self):
         
-        for ds_name,ds in self.dataset.items():
-            meta = ds.METADATA
-            for info in meta:
-                info['dataset'] = ds_name
+        if not self.rare_class_module:
+            for ds_name,ds in self.dataset.items():
+                meta = ds.METADATA
+                for info in meta:
+                    info['dataset'] = ds_name
+                
+                self._data_list.extend(meta)
+        else:
+            # Create a datalist per conditions
+            self._data_list = {c:[] for c in self.conditions_list}
+            for ds_name,ds in self.dataset.items():
+                meta = ds.METADATA
+                for info in meta:
+                    info['dataset'] = ds_name
+                    if ds_name == 'waymo':
+                        condition = self.condition_meta_data[ds_name].loc[
+                            (self.condition_meta_data[ds_name]['context_name'] == info['context_name']) &
+                            (self.condition_meta_data[ds_name]['context_frame'] == info['context_frame']) &
+                            (self.condition_meta_data[ds_name]['camera_id'] == info['camera_id'])
+                        ]['condition'].values[0]
+                    elif ds_name == 'bdd':
+                        condition = self.condition_meta_data[ds_name].loc[
+                            (self.condition_meta_data[ds_name]['file_name'] == info['file_name'])
+                        ]['condition'].values[0]
+                    self._data_list[condition].append(info)
             
-            self._data_list.extend(meta)
+    
+    def __len__(self) -> int:
+        if not self.rare_class_module:
+            return self._num_images
+        else:
+            max_size = max([len(v) for v in self._data_list.values()])
+            return max_size * len(self._data_list)
     
     # We need to return the prompt, segmentation image and the target image
     
@@ -186,8 +222,15 @@ class AVControlNetDataset(ExpDataset):
 
         if idx> self._num_images:
             raise IndexError(f'Index {idx} out of range')
-    
-        data_info = self._data_list[idx]
+
+        if not self.rare_class_module:
+            data_info = self._data_list[idx]
+        else:
+            condition = list(self._data_list.keys())[idx // max([len(v) for v in self._data_list.values()])]
+            idx_cond = idx % max([len(v) for v in self._data_list.values()])
+            data_info_idx = idx_cond % len(self._data_list[condition])
+            data_info = self._data_list[condition][data_info_idx]
+            
         dataset = data_info['dataset']
         
         if self.image_meta_data:
@@ -229,7 +272,7 @@ if __name__ == "__main__":
     }
     
     # Switch
-    ds = AVControlNetDataset(configs)
+    ds = AVControlNetDataset(configs, rare_class_module=True)
     print(len(ds))
     
     print(ds[10000].keys())
