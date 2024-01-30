@@ -108,7 +108,12 @@ class BDD100KDataset(ExpDataset):
                                                     "metadata_det.csv")
                     self.synth_contexts_path = os.path.join(self.bdd_config.SYNTH_TRAIN_DIR,
                                             "filenames_det.txt")
-
+                                
+                self.bdd_config.SYNTH_IMG_DIR = os.path.join(self.bdd_config.SYNTH_TRAIN_DIR,
+                                                             "img")
+                self.bdd_config.SYNTH_MASK_DIR = os.path.join(self.bdd_config.SYNTH_TRAIN_DIR,
+                                                              "mask")
+            
         self.mixing_ratio = mixing_ratio
         self.bdd_init(segmentation=segmentation,
                         validation=validation,
@@ -195,14 +200,15 @@ class BDD100KDataset(ExpDataset):
 
                 
             while added_images < self.synth_data_length:
-                with open(self.contexts_path_synth, 'r') as f:
+                with open(self.context_path_synth, 'r') as f:
                     
                     for line in f:
                         data_info = {
                             'file_name': line.strip(),
                             'condition': self.metadata_synth[
-                                self.metadata_synth['file_name'] == line.strip()
-                                ]['condition'].values[0]
+                                self.metadata_synth['filename'] == line.strip()
+                                ]['condition'].values[0],
+                            'synthetic': True
                         }
                         self._data_list.append(data_info)
                         self._num_images+=1
@@ -352,17 +358,25 @@ class BDD100KDataset(ExpDataset):
        
         if 'condition' in data.keys():
             condition = data['condition']
+        
             
         file_name = data['file_name']
-        img_path = os.path.join(self.bdd_config.IMG_DIR,
-                                file_name + '.jpg')
-        ann_path = os.path.join(self.bdd_config.MASK_DIR,
-                                file_name + '.png')
+        if 'synthetic' in data.keys():
+            img_path = os.path.join(self.bdd_config.SYNTH_IMG_DIR,
+                                    file_name + '.png')
+            ann_path = os.path.join(self.bdd_config.SYNTH_MASK_DIR,
+                                    file_name + '.png')
+        else:
+            img_path = os.path.join(self.bdd_config.IMG_DIR,
+                                    file_name + '.jpg')
+            ann_path = os.path.join(self.bdd_config.MASK_DIR,
+                                    file_name + '.png')
         
         camera_images = np.array(Image.open(img_path)).astype(np.uint8)
         if self.segmentation:
             object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
-            object_masks = (object_masks + 1)%256
+            if 'synthetic' not in data.keys():
+                object_masks = (object_masks + 1)%256
             instance_masks = object_masks.copy()
             semantic_mask_rgb = self.get_semantic_mask(object_masks)
         else:
