@@ -71,7 +71,7 @@ class ControlNetFineTune:
         dataset = AVControlNetDataset(configs)
         dataloader = DataLoader(dataset, num_workers=4, batch_size=self.config.batch_size, shuffle=True)
         logger = ImageLogger(batch_frequency=self.config.logger_freq)
-        trainer = pl.Trainer(gpus=6, precision=32, callbacks=[logger])#, logger= wandb_logger)
+        trainer = pl.Trainer(gpus=0, precision=32, callbacks=[logger])#, logger= wandb_logger)
 
 
         # Train!
