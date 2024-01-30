@@ -143,6 +143,10 @@ class BDDDatasetMM(BaseSegDataset):
                 reduce_zero_label=self.reduce_zero_label,
                 seg_fields=[],
             )
+            if 'condition' in data_dict:
+                data_info['condition'] = data_dict['condition']
+            if 'synthetic' in data_dict:
+                data_info['synthetic'] = data_dict['synthetic']
             data_list.append(data_info)
             
         return data_list
@@ -175,7 +179,7 @@ class BDDDatasetMM(BaseSegDataset):
         if self.segmentation:
             if self.dataset.image_meta_data:
                 camera_images, semantic_mask_rgb, instance_masks, object_masks, img_meta_data= \
-                    self.dataset._load_item_(data_info)
+                    self.dataset._load_item(data_info)
             
             data_info['img'] = camera_images
             data_info['gt_seg_map'] = object_masks
