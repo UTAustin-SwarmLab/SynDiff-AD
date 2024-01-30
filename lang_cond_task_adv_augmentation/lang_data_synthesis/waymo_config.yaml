@@ -75,13 +75,13 @@ ROBUSTIFICATION:
   val_file_path : 'waymo_open_data/waymo_env_conditions_val.csv'
 
 SYN_DATASET_GEN:
-  target_prob_soft: 0.001
-  num_synthetic_images: 2500
-  dataset_path: '/store/harsh/data/waymo_synthetic/' # waymo_syntheitc_nollava if use_llava_prompt is False
+  target_prob_soft: 0.05
+  num_synthetic_images: 5000
+  dataset_path: '/store/harsh/data/waymo_synthetic_ft/' # waymo_syntheitc_nollava if use_llava_prompt is False
   segmentation: True
   conditions_path: 'waymo_open_data/'
   use_llava_prompt: True
   llava_prompt_path: 'waymo_open_data/waymo_captions_train.csv'
   fid_results_path: 'lang_data_synthesis/synthesis_results/'
   fid_test_model: 'R50' # Swin-T or R50
-  use_finetuned: False # Whether to use finetuned controlnet or original controlnet
+  use_finetuned: True # Whether to use finetuned controlnet or original controlnet

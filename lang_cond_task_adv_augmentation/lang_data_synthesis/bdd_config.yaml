@@ -23,7 +23,7 @@ SYNTHESIS_PARAMS:
   GUESS : True
   DETECT_RESOLUTION : 1024
   IMAGE_RESOLUTION: 512
-  DDIMSTEPS : 30
+  DDIMSTEPS : 50
   SCALE: 9.0
   SEED: 2000
   ETA: 0.00
@@ -60,13 +60,13 @@ ROBUSTIFICATION:
   train_file_path : 'bdd100k/metadata_train_seg.csv'
   val_file_path : 'bdd100k/metadata_val_seg.csv'
 SYN_DATASET_GEN:
-  target_prob_soft: 0.001
+  target_prob_soft: 0.003
   num_synthetic_images: 5000
-  dataset_path: '/store/harsh/data/bdd_synthetic/' # waymo_syntheitc_llava if use_llava_prompt is True
+  dataset_path: '/store/harsh/data/bdd_synthetic_ft/' # waymo_syntheitc_llava if use_llava_prompt is True
   segmentation: True
   conditions_path: 'bdd100k/'
   use_llava_prompt: False
   llava_prompt_path: 'bdd100k/seg_captions_train.csv'
   fid_results_path: 'lang_data_synthesis/synthesis_results_bdd/'
   fid_test_model: 'R50' # Swin-T or R50
-  use_finetuned: False 
+  use_finetuned: True 
