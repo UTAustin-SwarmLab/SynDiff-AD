@@ -17,7 +17,6 @@ import os
 from waymo_open_dataset.utils import camera_segmentation_utils
 import torch 
 import functools
-
 from lang_data_synthesis.dataset import ExpDataset, collate_fn
 from lang_data_synthesis.utils import ADE_20K_PALETTE, COCO_PALETTE
 
