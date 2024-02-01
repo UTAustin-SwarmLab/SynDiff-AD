@@ -18,15 +18,16 @@ from ControlNet.cldm.logger import ImageLogger
 from ControlNet.cldm.model import create_model, load_state_dict
 
 from omegaconf import OmegaConf
-
+from argparse import ArgumentParser
 import torch
 import os
 
 class ControlNetFineTune:
     
-    def __init__(self, config) -> None:
+    def __init__(self, config, args) -> None:
         
         self.config = config
+        self.args = args
         if not os.path.exists(config.path_init_ckpt):
             self.model = self.setup_checkpoint(config)
         else:
@@ -68,7 +69,7 @@ class ControlNetFineTune:
         # wandb_logger.watch(self.model)
         
         
-        dataset = AVControlNetDataset(configs)
+        dataset = AVControlNetDataset(configs, rare_class_module=self.args.rct)
         dataloader = DataLoader(dataset, num_workers=4, batch_size=self.config.batch_size, shuffle=True)
         logger = ImageLogger(batch_frequency=self.config.logger_freq)
         trainer = pl.Trainer(gpus=0, precision=32, callbacks=[logger])#, logger= wandb_logger)
@@ -77,8 +78,20 @@ class ControlNetFineTune:
         # Train!
         trainer.fit(self.model, dataloader)
 
+def parse_args():
+    parser = ArgumentParser(description='Image Classification with CLIP')
+
+    parser.add_argument(
+        '--rct',
+        action='store_true',
+        default=False,
+        help='Whether to use rare class training')
+
+    return  parser.parse_args()
+
 
 if  __name__ == "__main__":
+    args = parse_args()
     config = OmegaConf.load('lang_data_synthesis/finetune_config.yaml')
-    finetune = ControlNetFineTune(config)
+    finetune = ControlNetFineTune(config, args)
     finetune.finetune_model()
