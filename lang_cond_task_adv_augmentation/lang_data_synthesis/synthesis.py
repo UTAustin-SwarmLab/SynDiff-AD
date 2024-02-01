@@ -302,31 +302,32 @@ def process(args, worker_id = None):
     
     config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
     config = omegaconf.OmegaConf.load(config_file_name)
-    with torch.device('cuda:{}'.format(worker_id)):
-        if worker_id is not None:
-            config.seed_offset = int(100/args.num_process)*worker_id + 1
-        else:
-            config.seed_offset = args.seed_offset
-            
-        if args.experiment == 'waymo':
-            dataset = WaymoDataset(config.IMAGE.WAYMO, 
-                                image_meta_data=IMAGE_META_DATA,
-                                segmentation=SEGMENTATION,
-                                validation=VALIDATION)
-        elif args.experiment == 'bdd':
-            dataset = BDD100KDataset(config.IMAGE.BDD, 
-                                image_meta_data=IMAGE_META_DATA,
-                                segmentation=SEGMENTATION,
-                                validation=VALIDATION)
-        elif args.experiment == 'plan':
-            raise NotImplementedError
-        elif args.experiment == 'cliport':
-            raise NotImplementedError
-        else:
-            raise ValueError("Experiment not supported")
-        dataset_gen = SyntheticAVGenerator(source_dataset=dataset,
-                                        config=config)
-        dataset_gen.generate_synthetic_dataset()
+
+    if worker_id is not None:
+        torch.cuda.set_device('cuda:{}'.format(worker_id))
+        config.seed_offset = int(100/args.num_process)*worker_id + 1
+    else:
+        config.seed_offset = args.seed_offset
+        
+    if args.experiment == 'waymo':
+        dataset = WaymoDataset(config.IMAGE.WAYMO, 
+                            image_meta_data=IMAGE_META_DATA,
+                            segmentation=SEGMENTATION,
+                            validation=VALIDATION)
+    elif args.experiment == 'bdd':
+        dataset = BDD100KDataset(config.IMAGE.BDD, 
+                            image_meta_data=IMAGE_META_DATA,
+                            segmentation=SEGMENTATION,
+                            validation=VALIDATION)
+    elif args.experiment == 'plan':
+        raise NotImplementedError
+    elif args.experiment == 'cliport':
+        raise NotImplementedError
+    else:
+        raise ValueError("Experiment not supported")
+    dataset_gen = SyntheticAVGenerator(source_dataset=dataset,
+                                    config=config)
+    dataset_gen.generate_synthetic_dataset()
     
 if __name__ == "__main__":
     args = parse_args()
