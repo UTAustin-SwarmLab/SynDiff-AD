@@ -75,7 +75,7 @@ ROBUSTIFICATION:
   val_file_path : 'waymo_open_data/waymo_env_conditions_val.csv'
 
 SYN_DATASET_GEN:
-  target_prob_soft: 0.05
+  target_prob_soft: 0.00001
   num_synthetic_images: 5000
   dataset_path: '/store/harsh/data/waymo_synthetic_ft/' # waymo_syntheitc_nollava if use_llava_prompt is False
   segmentation: True
