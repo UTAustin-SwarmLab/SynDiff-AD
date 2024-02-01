@@ -72,7 +72,7 @@ class ControlNetFineTune:
         dataset = AVControlNetDataset(configs, rare_class_module=self.args.rct)
         dataloader = DataLoader(dataset, num_workers=4, batch_size=self.config.batch_size, shuffle=True)
         logger = ImageLogger(batch_frequency=self.config.logger_freq)
-        trainer = pl.Trainer(gpus=0, precision=32, callbacks=[logger])#, logger= wandb_logger)
+        trainer = pl.Trainer(gpus=self.args.num_gpus, precision=32, callbacks=[logger])#, logger= wandb_logger)
 
 
         # Train!
@@ -86,6 +86,12 @@ def parse_args():
         action='store_true',
         default=False,
         help='Whether to use rare class training')
+    
+    parser.add_argument(
+        '--num_gpus',
+        type=int,
+        default=1,
+        help='Number of gpus to use for training')
 
     return  parser.parse_args()
 
