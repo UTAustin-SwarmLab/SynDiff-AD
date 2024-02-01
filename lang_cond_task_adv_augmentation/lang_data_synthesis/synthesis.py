@@ -24,7 +24,7 @@ from bdd100k.data_loader import BDD100KDataset
 from PIL import Image
 from lang_data_synthesis.dataset import ExpDataset
 from multiprocessing import Process
-
+import multiprocessing
 class SyntheticAVGenerator:
     
     def __init__(
