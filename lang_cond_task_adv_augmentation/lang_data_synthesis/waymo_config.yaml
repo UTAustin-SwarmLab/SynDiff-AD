@@ -5,14 +5,14 @@ IMAGE:
     DATASET_PATH : 'ADE20K/dataset/' # separate path for waymo
   WAYMO:
     # All waymo parameters @markdown #### Replace this path with your own tfrecords. 
-    TRAIN_DIR: '/store/datasets/waymo/training/' #@param {type:"string"}
+    TRAIN_DIR: '/home/hg22723/datasets/waymo/training/' #@param {type:"string"}
     #@markdown #### Replace this directory with your own dataset folder for evaluation.
-    EVAL_DIR: '/store/datasets/waymo/validation/' #@param {type: "string"}
+    EVAL_DIR: '/home/hg22723/datasets/waymo/validation/' #@param {type: "string"}
     #@markdown #### Replace this path with the real path. Each line of the file is the "\, \" of a frame with camera segmentation labels.
     TEST_SET_SOURCE: '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt' #@param {type: "string"} 
 
     #@markdown #### Replace this directory with your own testing dataset folder.
-    TEST_DIR: '/store/datasets/waymo/testing/' #@param {type: "string"}
+    TEST_DIR: '/home/hg22723/datasets/waymo/testing/' #@param {type: "string"}
     # Visualization Path
     VIZ_DIR: '../waymo_data/visualization/' #@param {type: "string"}
     NUM_CPU: 16 #@param {type: "integer"}
@@ -75,9 +75,9 @@ ROBUSTIFICATION:
   val_file_path : 'waymo_open_data/waymo_env_conditions_val.csv'
 
 SYN_DATASET_GEN:
-  target_prob_soft: 0.05
+  target_prob_soft: 0.00001
   num_synthetic_images: 5000
-  dataset_path: '/store/harsh/data/waymo_synthetic_ft/' # waymo_syntheitc_nollava if use_llava_prompt is False
+  dataset_path: '/home/hg22723/synthdata/waymo_synthetic_ft/' # waymo_syntheitc_nollava if use_llava_prompt is False
   segmentation: True
   conditions_path: 'waymo_open_data/'
   use_llava_prompt: True

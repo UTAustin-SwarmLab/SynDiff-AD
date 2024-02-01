@@ -1,6 +1,6 @@
 IMAGE:
   BDD:
-    DATASET_DIR: '/store/datasets/bdd100k/'
+    DATASET_DIR: '/home/hg22723/datasets/bdd100k/'
     SYNTH_TRAIN_DIR: None # Always set in the sub programs
     TRAIN_META_PATH: 'bdd100k/'
     VAL_META_PATH: 'bdd100k/'
@@ -60,9 +60,9 @@ ROBUSTIFICATION:
   train_file_path : 'bdd100k/metadata_train_seg.csv'
   val_file_path : 'bdd100k/metadata_val_seg.csv'
 SYN_DATASET_GEN:
-  target_prob_soft: 0.003
+  target_prob_soft: 0.000001
   num_synthetic_images: 5000
-  dataset_path: '/store/harsh/data/bdd_synthetic_ft/' # waymo_syntheitc_llava if use_llava_prompt is True
+  dataset_path: '/home/hg22723/synthdata/bdd_synthetic_ft/' # waymo_syntheitc_llava if use_llava_prompt is True
   segmentation: True
   conditions_path: 'bdd100k/'
   use_llava_prompt: False

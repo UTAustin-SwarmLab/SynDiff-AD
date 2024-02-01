@@ -99,5 +99,6 @@ def parse_args():
 if  __name__ == "__main__":
     args = parse_args()
     config = OmegaConf.load('lang_data_synthesis/finetune_config.yaml')
+
     finetune = ControlNetFineTune(config, args)
     finetune.finetune_model()
