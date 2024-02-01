@@ -261,6 +261,7 @@ class AVControlNetDataset(ExpDataset):
         camera_images = cv2.resize(camera_images, (RESIZE, RESIZE), interpolation= cv2.INTER_AREA)
         #camera_images = resize_image(camera_images, RESIZE)
         H, W, C = camera_images.shape
+        print(H, W, C)
             
         semantic_mask = cv2.resize(semantic_mask, (W, H), interpolation=cv2.INTER_NEAREST)
         semantic_mask = semantic_mask.astype(np.float32) / 255.0
