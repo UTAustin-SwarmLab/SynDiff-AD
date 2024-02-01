@@ -220,8 +220,12 @@ class AVControlNetDataset(ExpDataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # We would write a getitem for both the waymo and the nuscenes datasets
 
-        if idx> self._num_images:
-            raise IndexError(f'Index {idx} out of range')
+        if not self.rare_class_module:
+            if idx> self._num_images:
+                raise IndexError(f'Index {idx} out of range')
+        else:
+            if idx>max([len(v) for v in self._data_list.values()])* len(self._data_list) :
+                raise IndexError(f'Index {idx} out of range')
 
         if not self.rare_class_module:
             data_info = self._data_list[idx]
