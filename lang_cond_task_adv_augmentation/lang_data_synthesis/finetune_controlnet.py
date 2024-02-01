@@ -21,7 +21,7 @@ from omegaconf import OmegaConf
 from argparse import ArgumentParser
 import torch
 import os
-
+import tensorflow as tf
 class ControlNetFineTune:
     
     def __init__(self, config, args) -> None:
@@ -70,8 +70,11 @@ class ControlNetFineTune:
         
         
         dataset = AVControlNetDataset(configs, rare_class_module=self.args.rct)
-        print("Batch Size {}".format(self.config.batch_size))
-        dataloader = DataLoader(dataset, num_workers=4, batch_size=self.config.batch_size, shuffle=True)
+
+        dataloader = DataLoader(dataset, num_workers=4,
+                                batch_size=self.config.batch_size,
+                                shuffle=True)
+
         logger = ImageLogger(batch_frequency=self.config.logger_freq)
         trainer = pl.Trainer(gpus=self.args.num_gpus, precision=32, callbacks=[logger])#, logger= wandb_logger)
 
@@ -99,6 +102,7 @@ def parse_args():
 
 if  __name__ == "__main__":
     args = parse_args()
+    tf.config.set_visible_devices([], 'GPU')
     config = OmegaConf.load('lang_data_synthesis/finetune_config.yaml')
 
     finetune = ControlNetFineTune(config, args)
