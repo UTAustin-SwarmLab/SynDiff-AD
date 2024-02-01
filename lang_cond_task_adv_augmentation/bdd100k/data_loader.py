@@ -359,43 +359,43 @@ class BDD100KDataset(ExpDataset):
         if 'condition' in data.keys():
             condition = data['condition']
         
+        with torch.device('cpu'):
+            file_name = data['file_name']
+            if 'synthetic' in data.keys():
+                img_path = os.path.join(self.bdd_config.SYNTH_IMG_DIR,
+                                        file_name + '.png')
+                ann_path = os.path.join(self.bdd_config.SYNTH_MASK_DIR,
+                                        file_name + '.png')
+            else:
+                img_path = os.path.join(self.bdd_config.IMG_DIR,
+                                        file_name + '.jpg')
+                ann_path = os.path.join(self.bdd_config.MASK_DIR,
+                                        file_name + '.png')
             
-        file_name = data['file_name']
-        if 'synthetic' in data.keys():
-            img_path = os.path.join(self.bdd_config.SYNTH_IMG_DIR,
-                                    file_name + '.png')
-            ann_path = os.path.join(self.bdd_config.SYNTH_MASK_DIR,
-                                    file_name + '.png')
-        else:
-            img_path = os.path.join(self.bdd_config.IMG_DIR,
-                                    file_name + '.jpg')
-            ann_path = os.path.join(self.bdd_config.MASK_DIR,
-                                    file_name + '.png')
-        
-        camera_images = np.array(Image.open(img_path)).astype(np.uint8)
-        if self.segmentation:
-            object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
-            if 'synthetic' not in data.keys():
-                object_masks = (object_masks + 1)%256
-            instance_masks = object_masks.copy()
-            semantic_mask_rgb = self.get_semantic_mask(object_masks)
-        else:
-            raise NotImplementedError
-        
-        img_data = data
- 
+            camera_images = np.array(Image.open(img_path)).astype(np.uint8)
+            if self.segmentation:
+                object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
+                if 'synthetic' not in data.keys():
+                    object_masks = (object_masks + 1)%256
+                instance_masks = object_masks.copy()
+                semantic_mask_rgb = self.get_semantic_mask(object_masks)
+            else:
+                raise NotImplementedError
+            
+            img_data = data
+    
 
-        if self.segmentation:
-            if self.image_meta_data:
-                return camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data
+            if self.segmentation:
+                if self.image_meta_data:
+                    return camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data
+                else:
+                    return camera_images, semantic_mask_rgb, instance_masks, object_masks
             else:
-                return camera_images, semantic_mask_rgb, instance_masks, object_masks
-        else:
-            raise NotImplementedError
-            if self.image_meta_data:
-                return camera_images, box_classes, bounding_boxes, img_data
-            else:
-                return camera_images, box_classes, bounding_boxes
+                raise NotImplementedError
+                if self.image_meta_data:
+                    return camera_images, box_classes, bounding_boxes, img_data
+                else:
+                    return camera_images, box_classes, bounding_boxes
     
     def __getitem__(
             self, 
