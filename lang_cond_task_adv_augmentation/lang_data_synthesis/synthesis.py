@@ -23,6 +23,7 @@ import tensorflow as tf
 from bdd100k.data_loader import BDD100KDataset
 from PIL import Image
 from lang_data_synthesis.dataset import ExpDataset
+from multiprocessing import Process
 
 class SyntheticAVGenerator:
     
@@ -283,11 +284,16 @@ def parse_args():
         type=int,
         default=2000,
         help='Offset seed for random number generators')
+    parser.add_argument(
+        '--num_process',
+        type = int,
+        default=1,
+        help='How many parallel processes' 
+    )
     return  parser.parse_args()
-      
-if __name__ == "__main__":
-    args = parse_args()
-    
+
+
+def process(args, worker_id = None):
     SEGMENTATION = args.segmentation
     IMAGE_META_DATA = True
     VALIDATION = False
@@ -296,23 +302,53 @@ if __name__ == "__main__":
     
     config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
     config = omegaconf.OmegaConf.load(config_file_name)
-    config.seed_offset = args.seed_offset
-    if args.experiment == 'waymo':
-        dataset = WaymoDataset(config.IMAGE.WAYMO, 
-                            image_meta_data=IMAGE_META_DATA,
-                            segmentation=SEGMENTATION,
-                            validation=VALIDATION)
-    elif args.experiment == 'bdd':
-        dataset = BDD100KDataset(config.IMAGE.BDD, 
-                            image_meta_data=IMAGE_META_DATA,
-                            segmentation=SEGMENTATION,
-                            validation=VALIDATION)
-    elif args.experiment == 'plan':
-        raise NotImplementedError
-    elif args.experiment == 'cliport':
-        raise NotImplementedError
+    with torch.device('cuda:{}'.format(worker_id)):
+        if worker_id is not None:
+            config.seed_offset = int(100/args.num_process)*worker_id + 1
+        else:
+            config.seed_offset = args.seed_offset
+            
+        if args.experiment == 'waymo':
+            dataset = WaymoDataset(config.IMAGE.WAYMO, 
+                                image_meta_data=IMAGE_META_DATA,
+                                segmentation=SEGMENTATION,
+                                validation=VALIDATION)
+        elif args.experiment == 'bdd':
+            dataset = BDD100KDataset(config.IMAGE.BDD, 
+                                image_meta_data=IMAGE_META_DATA,
+                                segmentation=SEGMENTATION,
+                                validation=VALIDATION)
+        elif args.experiment == 'plan':
+            raise NotImplementedError
+        elif args.experiment == 'cliport':
+            raise NotImplementedError
+        else:
+            raise ValueError("Experiment not supported")
+        dataset_gen = SyntheticAVGenerator(source_dataset=dataset,
+                                        config=config)
+        dataset_gen.generate_synthetic_dataset()
+    
+if __name__ == "__main__":
+    args = parse_args()
+    
+
+    if args.num_process == 1:
+        process(args)
     else:
-        raise ValueError("Experiment not supported")
-    dataset_gen = SyntheticAVGenerator(source_dataset=dataset,
-                                       config=config)
-    dataset_gen.generate_synthetic_dataset()
+        num_workers = args.num_process
+        workers = [Process(target=process, 
+                        args=(args, 
+                              i))
+                for i in range(num_workers)]
+        
+        for w in workers:
+            w.start()
+
+        # Collect results
+        # all_captions = []
+        # for _ in range(len(self.dataloader)):
+        #     all_captions.extend(result_queue.get())
+
+        # Wait for all worker processes to finish
+        for w in workers:
+            w.join()
