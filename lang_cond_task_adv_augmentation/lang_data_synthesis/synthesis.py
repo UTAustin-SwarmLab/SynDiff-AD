@@ -335,6 +335,7 @@ if __name__ == "__main__":
     if args.num_process == 1:
         process(args)
     else:
+        multiprocessing.set_start_method('spawn', force=True)
         num_workers = args.num_process
         workers = [Process(target=process, 
                         args=(args, 
