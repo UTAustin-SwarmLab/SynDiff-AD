@@ -1,0 +1,134 @@
+IMAGE:
+  CARLA:
+    root_dir: '/store/harsh/carla_data_neat/'
+    train_towns:
+      ["expert",
+      "synthexpert"]
+    val_towns: ["expert"]
+    train_data: []
+    val_data: []
+    num_camera: 3
+    pred_len: 4
+    seq_len: 1
+    tot_len: 5
+    scale: 1
+    crop: 256
+    scale_topdown: 1
+    crop_topdown: 512
+    resolution: 0.18181818182
+    axis: 256
+    offset: 128
+    num_class: 5
+    classes: { 0: [0, 0, 0], 1: [0, 0, 255], 2: [128, 64, 128], 3: [255, 0, 0], 4: [0, 255, 0]}
+    converter:
+      [0, 0, 0, 0, 1, 0, 2, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 4, 0]
+    points_per_class: 64
+    t_height: 2.0
+    lr: 0.0001
+    loss_perc: 1.0
+    loss_plan: 0.1
+    iter_losses:
+      [0.1, 1.0]
+    vert_anchors: 8
+    horz_anchors: 8
+    anchors: 64
+    n_layer: 2
+    n_embd: 512
+    block_exp: 4
+    n_head: 4
+    embd_pdrop: 0.1
+    resid_pdrop: 0.1
+    attn_pdrop: 0.1
+    attention_iters: 2
+    onet_hidden_size: 128
+    onet_blocks: 5
+    plan_points: 1
+    light_x_steps: 16
+    light_y_steps: 32
+    plan_iters: 1
+    plan_scale: 0.1
+    aim_dist: 4.0
+    angle_thresh: 0.3
+    dist_thresh: 10
+    turn_KP: 0.75
+    turn_KI: 0.75
+    turn_KD: 0.3
+    turn_n: 40
+    speed_KP: 5.0
+    speed_KI: 0.5
+    speed_KD: 1.0
+    speed_n: 40
+    red_light_mult: 0.0
+    max_throttle: 0.75
+    brake_speed: 0.4
+    brake_ratio: 1.1
+    clip_delta: 0.25
+
+  DATASET_DIR: '/store/harsh/carla_data_neat/'
+  SYNTH_TRAIN_DIR: None # Always set in the sub programs
+  TRAIN_META_PATH: 'bdd100k/' # TODO : change this to the validation path
+  VAL_META_PATH: 'bdd100k/' # TODO : change this to the validation path
+  PALLETE: 'coco' # coco or bdd or ade20k
+control_net:
+  CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
+  MODEL_PATH: 'ControlNet/models/control_v11p_sd15_seg.pth'
+  FT_MODEL_PATH: 'ControlNet/models/control_v11p_sd15_av2.ckpt' # TODO : change this to the validation path
+  SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
+  USE_FINETUNED: True
+SEGMENT_MODEL: 
+  TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
+GRADIO: False
+SAVE:
+  PATH: 'lang_data_synthesis/test_results_bdd/'
+SYNTHESIS_PARAMS:
+  SYNTH_TRAIN_DIR: None # Always set in the sub programs
+  CONTROL : 1.0
+  NUMSAMPLES : 2
+  GUESS : True
+  DETECT_RESOLUTION : 1024
+  IMAGE_RESOLUTION: 512
+  DDIMSTEPS : 50
+  SCALE: 9.0
+  SEED: 2000
+  ETA: 0.00
+  INIT_NOISE: 1.0
+  ANNOTATOR: 'Seg_OFADE20K'
+  A_PROMPT: 'camera like photo, realistic textures, HD quality'
+  N_PROMPT: 'unrealistic, very sharp, disfigured, ugly, bad, immature, cartoon, anime, 3d, painting, b&w, cropped, worst quality'
+LLAVACAPTION:
+    MODELPATH: 'liuhaotian/llava-v1.5-13b'
+    MODELBASE: None
+    NUM_IMAGES: 'ALL' # 'ALL' or int
+    prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), lighting conditions and image quality. Don't mention the weather conditions or daytime."
+    conv_mode: 'llava_v1'
+    batch_size: 16
+    load_8bit: False
+    load_4bit: True
+    num_workers: 6
+    conditions_path: 'bdd100k/metadata_train_seg.csv' # TODO : change this to the validation path
+    captions_path_multi: 'bdd100k/seg_captions_train_{}.csv' # TODO : change this to the validation path
+    captions_path_single: 'bdd100k/seg_captions_train.csv' # TODO : change this to the validation path
+    model_per_gpu: 2
+ROBUSTIFICATION:       
+  test_conditions : [
+    ["ClearMorning", "CloudyMorning", "RainMorning", "ClearNight", "CloudyNight", "RainNight","ClearTwilight", "CloudyTwilight", "RainTwilight"]
+  ]
+  dataset_metadata_path: ""
+  classify: True
+  prompt_add: [
+    'An image taken during {} weather conditions.',
+    ]
+  batch_size: 8
+  train_file_path : 'bdd100k/metadata_train_seg.csv' # TODO : change this to the validation path
+  val_file_path : 'bdd100k/metadata_val_seg.csv' # TODO : change this to the validation path
+SYN_DATASET_GEN:
+  target_prob_soft: 0.000001
+  num_synthetic_images: 5000
+  dataset_path: '/store/harsh/data/carla_synthetic_ft/' # waymo_synthetic_llava if use_llava_prompt is True # TODO : change this to the validation path
+  segmentation: True
+  conditions_path: 'bdd100k/'
+  use_llava_prompt: False
+  llava_prompt_path: 'bdd100k/seg_captions_train.csv' # TODO : change this to the validation path
+  fid_results_path: 'lang_data_synthesis/synthesis_results_bdd/' # TODO : change this to the validation path
+  fid_test_model: 'R50' # Swin-T or R50
+  use_finetuned: True 
