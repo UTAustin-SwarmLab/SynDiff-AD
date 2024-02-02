@@ -154,18 +154,18 @@ class AutoPilot(MapAgent):
 		if not self.initialized:
 			self._init()
 
-		# change weather for visual diversity
-		if self.step % 10 == 0 and self.save_path is not None:
-			index = random.choice(range(len(WEATHERS)))
-			dtime, altitude = random.choice(list(daytimes.items()))
-			altitude = np.random.normal(altitude, 10)
-			self.weather_id = WEATHERS_IDS[index] + dtime
+		# # change weather for visual diversity
+		# if self.step % 10 == 0 and self.save_path is not None:
+		# 	index = random.choice(range(len(WEATHERS)))
+		# 	dtime, altitude = random.choice(list(daytimes.items()))
+		# 	altitude = np.random.normal(altitude, 10)
+		# 	self.weather_id = WEATHERS_IDS[index] + dtime
 
-			weather = WEATHERS[WEATHERS_IDS[index]]
-			weather.sun_altitude_angle = altitude
-			weather.sun_azimuth_angle = np.random.choice(azimuths)
+		# 	weather = WEATHERS[WEATHERS_IDS[index]]
+		# 	weather.sun_altitude_angle = altitude
+		# 	weather.sun_azimuth_angle = np.random.choice(azimuths)
 
-			self._world.set_weather(weather)
+		# 	self._world.set_weather(weather)
 
 		self.step += 1
 		gps = self._get_position(input_data['gps'][1][:2])
