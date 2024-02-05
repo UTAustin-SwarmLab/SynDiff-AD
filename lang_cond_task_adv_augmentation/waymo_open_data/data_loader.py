@@ -537,7 +537,7 @@ class WaymoDataset(ExpDataset):
         camera_id = data['camera_id']
     
         
-        with tf.device('cpu'):
+        with tf.device('cpu') and torch.device('cpu'):
             if self.segmentation:
                 data = load_data_set_parquet(
                     config=self.ds_config, 
