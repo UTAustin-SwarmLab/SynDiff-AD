@@ -38,7 +38,7 @@ from leaderboard.autoagents.agent_wrapper import  AgentWrapper, AgentError
 from leaderboard.utils.statistics_manager import StatisticsManager
 from leaderboard.utils.route_indexer import RouteIndexer
 
-
+from pdb import set_trace as bp
 sensors_to_icons = {
     'sensor.camera.rgb':        'carla_camera',
     'sensor.camera.semantic_segmentation': 'carla_camera',
@@ -265,7 +265,11 @@ class LeaderboardEvaluator(object):
         try:
             self._agent_watchdog.start()
             agent_class_name = getattr(self.module_agent, 'get_entry_point')()
-            self.agent_instance = getattr(self.module_agent, agent_class_name)(args.agent_config)
+            if 'AutoPilot' in agent_class_name:
+                agent_config = {'config': args.agent_config, 'weather': config.weather.id}
+            else:
+                agent_config = args.agent_config
+            self.agent_instance = getattr(self.module_agent, agent_class_name)(agent_config)
             config.agent = self.agent_instance
 
             # Check and store the sensors
@@ -394,8 +398,8 @@ class LeaderboardEvaluator(object):
         """
         Run the challenge mode
         """
-        # agent_class_name = getattr(self.module_agent, 'get_entry_point')()
-        # self.agent_instance = getattr(self.module_agent, agent_class_name)(args.agent_config)
+        #agent_class_name = getattr(self.module_agent, 'get_entry_point')()
+        #self.agent_instance = getattr(self.module_agent, agent_class_name)(args.agent_config)
 
         route_indexer = RouteIndexer(args.routes, args.scenarios, args.repetitions)
 

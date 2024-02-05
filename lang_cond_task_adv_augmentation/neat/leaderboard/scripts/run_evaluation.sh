@@ -1,5 +1,5 @@
 # CARLA path
-export CARLA_ROOT=/home/kchitta/Documents/CARLA_0.9.10.1 # path to CARLA install
+export CARLA_ROOT=/home/hg22723/projects/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation/neat/carla # path to CARLA install
 export CARLA_SERVER=${CARLA_ROOT}/CarlaUE4.sh
 export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI
 export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI/carla
@@ -12,11 +12,11 @@ export CHALLENGE_TRACK_CODENAME=SENSORS
 export DEBUG_CHALLENGE=0
 
 # Server Ports
-export PORT=2000 # same as the carla server port
-export TM_PORT=8000 # port for traffic manager, required when spawning multiple servers/clients
+export PORT=2400 # same as the carla server port
+export TM_PORT=8504 # port for traffic manager, required when spawning multiple servers/clients
 
 # Evaluation Setup
-export ROUTES=leaderboard/data/evaluation_routes/eval_routes_weathers.xml # routes file
+export ROUTES=leaderboard/data/evaluation_routes/train_routes_weathers.xml # routes file
 export SCENARIOS=leaderboard/data/scenarios/eval_scenarios.json # scenarios file
 export REPETITIONS=1 # number of evaluation runs
 export RESUME=0 # resume evaluation from partial results file
@@ -24,8 +24,8 @@ export RESUME=0 # resume evaluation from partial results file
 # Agent Paths
 export TEAM_AGENT=leaderboard/team_code/auto_pilot.py # agent script
 export TEAM_CONFIG=./model_ckpt/neat # model checkpoint (not required for auto_pilot)
-export CHECKPOINT_ENDPOINT=../carla_results/auto_pilot.json # output results file
-# export SAVE_PATH=../carla_results/auto_pilot_eval # path for saving episodes (comment to disable)
+export CHECKPOINT_ENDPOINT=/store/harsh/carla_data_neat/auto_pilot.json # output results file
+export SAVE_PATH=/store/harsh/carla_data_neat/expert # path for saving episodes (comment to disable)
 
 python3 ${LEADERBOARD_ROOT}/leaderboard/leaderboard_evaluator.py \
 --scenarios=${SCENARIOS}  \
