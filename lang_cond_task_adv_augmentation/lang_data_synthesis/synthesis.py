@@ -158,6 +158,17 @@ class SyntheticAVGenerator:
             prompt = prompt.replace(source_weather, weather)
             prompt = prompt.replace(source_day, day)
             
+            if 'context_name' in img_data.keys() or 'file_name' in img_data.keys():
+                # remove all the words associated with the source condition
+
+                prompt = prompt.replace(source_day.lower(), day)   
+                
+                if 'y' in source_weather:
+                    prompt = prompt.replace(source_weather[:-1].lower(), weather)
+                    prompt = prompt.replace(source_weather[:-1], weather)
+                else:
+                    prompt = prompt.replace(source_weather.lower(), weather)
+                
         else:
             prompt = 'This image is taken during {} time of the day and features {} weather. '.format(day, weather)
         with torch.no_grad():
@@ -216,10 +227,10 @@ class SyntheticAVGenerator:
                     file_name = str(img_data['context_name'])+"_"\
                     +str(img_data['context_frame'])+"_"+\
                     str(img_data['camera_id'])+"_"+\
-                    str(j)+"_"+str(i)
+                    str(j)+"_"+str(i)+"_"+str(self.config.seed_offset)
                 elif 'file_name' in img_data.keys():
                    file_name = str(img_data['file_name'])+\
-                    "_"+ str(j)+"_"+str(i)
+                    "_"+ str(j)+"_"+str(i)+"_"+str(self.config.seed_offset)
                     
                 # file_name = str(img_data['context_name'])+"_"\
                 #     +str(img_data['context_frame'])+"_"+\
