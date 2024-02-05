@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 import carla
 from agents.navigation.local_planner import RoadOption
 from srunner.scenarioconfigs.route_scenario_configuration import RouteScenarioConfiguration
-
+from pdb import set_trace as bp
 # TODO  check this threshold, it could be a bit larger but not so large that we cluster scenarios.
 TRIGGER_THRESHOLD = 2.0  # Threshold to say if a trigger position is new or repeated, works for matching positions
 TRIGGER_ANGLE_THRESHOLD = 10  # Threshold to say if two angles can be considering matching when matching transforms.
@@ -104,7 +104,6 @@ class RouteParser(object):
         """
 
         route_weather = route.find("weather")
-
         if route_weather is None:
 
             weather = carla.WeatherParameters(sun_altitude_angle=70, cloudiness=30)
@@ -133,7 +132,8 @@ class RouteParser(object):
                     weather.fog_density = float(weather_attrib.attrib['fog_density'])
                 if 'fog_falloff' in weather_attrib.attrib:
                     weather.fog_falloff = float(weather_attrib.attrib['fog_falloff'])
-
+                if 'id' in weather_attrib.attrib:
+                    weather.id = weather_attrib.attrib['id']
         return weather
 
     @staticmethod

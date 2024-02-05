@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 
 from team_code.map_agent import MapAgent
 from team_code.pid_controller import PIDController
-
+from pdb import set_trace as bp
 
 WEATHERS = {
 		'Clear': carla.WeatherParameters.ClearNoon,
@@ -154,6 +154,7 @@ class AutoPilot(MapAgent):
 		if not self.initialized:
 			self._init()
 
+		weather = self._world.get_weather()
 		# # change weather for visual diversity
 		# if self.step % 10 == 0 and self.save_path is not None:
 		# 	index = random.choice(range(len(WEATHERS)))

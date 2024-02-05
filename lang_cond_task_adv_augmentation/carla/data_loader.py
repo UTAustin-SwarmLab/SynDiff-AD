@@ -17,7 +17,7 @@ import pandas as pd
 from PIL import Image
 
 from lang_data_synthesis.dataset import ExpDataset, collate_fn
-
+import json
 class CARLADataset(ExpDataset):
     '''
     Loads the dataset from the carla data folders
@@ -101,11 +101,17 @@ class CARLADataset(ExpDataset):
                             mask_route_dir = mask_route_dir.replace(route, mask_home_root)
                         else:
                             mask_route_dir = route_dir  
+                        
+                        # Open measurements.json to load weather condition
+                        with open(route_dir + f"/measurements/{str(seq).zfill(4)}.json", "r") as read_file:
+                            data = json.load(read_file)
+                            conditions = data['weather']
                         data_dict = {
                             'route': route,
                             'file_name':route_dir+"/rgb_front/"+filename,
                             'mask_path': mask_route_dir+"/seg_front/"+filename,
-                            'synthetic': synthetic
+                            'synthetic': synthetic,
+                            'conditions': conditions
                         }
                         
                         self._data_list.append(data_dict)
@@ -113,7 +119,8 @@ class CARLADataset(ExpDataset):
                             'route': route,
                             'file_name':route_dir+"/rgb_left/"+filename,
                             'mask_path':  mask_route_dir+"/seg_left/"+filename,
-                            'synthetic': synthetic
+                            'synthetic': synthetic,
+                            'conditions': conditions
                         }
                         
                         self._data_list.append(data_dict)
@@ -122,7 +129,8 @@ class CARLADataset(ExpDataset):
                             'route': route,
                             'file_name':route_dir+"/rgb_right/"+filename,
                             'mask_path': mask_route_dir+"/seg_right/"+filename,
-                            'synthetic': synthetic
+                            'synthetic': synthetic,
+                            'conditions': conditions
                         }
                         self._data_list.append(data_dict)
         self._num_images = len(self._data_list)

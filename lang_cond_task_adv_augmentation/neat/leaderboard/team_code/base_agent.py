@@ -14,12 +14,12 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 SAVE_PATH = os.environ.get('SAVE_PATH', None) # for saving episodes at rollout
-
+from pdb import set_trace as bp
 
 class BaseAgent(autonomous_agent.AutonomousAgent):
     def setup(self, path_to_conf_file):
         self.track = autonomous_agent.Track.SENSORS
-        self.config_path = path_to_conf_file
+        self.config_path = path_to_conf_file['config']
         self.step = -1
         self.wall_start = time.time()
         self.initialized = False
@@ -30,7 +30,10 @@ class BaseAgent(autonomous_agent.AutonomousAgent):
             'fov': 100
         }
 
-        self.weather_id = None
+        if 'weather' in path_to_conf_file:
+            self.weather_id = path_to_conf_file['weather']
+        else:
+            self.weather_id = None
 
         self.save_path = None
 
@@ -218,7 +221,7 @@ class BaseAgent(autonomous_agent.AutonomousAgent):
 
     def tick(self, input_data):
         weather = self._weather_to_dict(self._world.get_weather())
-
+        
         gps = input_data['gps'][1][:2]
         speed = input_data['speed'][1]['speed']
         compass = input_data['imu'][1][-1]
