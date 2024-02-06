@@ -63,9 +63,6 @@ IMAGE:
     clip_delta: 0.25
 
   DATASET_DIR: '/store/harsh/carla_data_neat/'
-  SYNTH_TRAIN_DIR: None # Always set in the sub programs
-  TRAIN_META_PATH: 'bdd100k/' # TODO : change this to the validation path
-  VAL_META_PATH: 'bdd100k/' # TODO : change this to the validation path
   PALLETE: 'coco' # coco or bdd or ade20k
 control_net:
   CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
@@ -77,7 +74,7 @@ SEGMENT_MODEL:
   TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
 GRADIO: False
 SAVE:
-  PATH: 'lang_data_synthesis/test_results_bdd/'
+  PATH: 'lang_data_synthesis/test_results_carla/'
 SYNTHESIS_PARAMS:
   SYNTH_TRAIN_DIR: None # Always set in the sub programs
   CONTROL : 1.0
@@ -97,15 +94,15 @@ LLAVACAPTION:
     MODELPATH: 'liuhaotian/llava-v1.5-13b'
     MODELBASE: None
     NUM_IMAGES: 'ALL' # 'ALL' or int
-    prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), and image quality. Don't mention the weather conditions [clear or sunny, rainy, cloudy] or time [day, twilight, night]"
+    prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), and image quality. Don't mention the weather conditions [clear or sunny, rainy, cloudy] or time [day, twilight or dawn or dusk, night]"
     conv_mode: 'llava_v1'
     batch_size: 16
     load_8bit: False
     load_4bit: True
     num_workers: 10
-    conditions_path: 'bdd100k/metadata_train_seg.csv' # TODO : change this to the validation path
-    captions_path_multi: 'bdd100k/seg_captions_train_{}.csv' # TODO : change this to the validation path
-    captions_path_single: 'bdd100k/seg_captions_train.csv' # TODO : change this to the validation path
+    conditions_path: None # TODO : change this to the validation path
+    captions_path_multi: 'carla/seg_captions_train_{}.csv' # TODO : change this to the validation path
+    captions_path_single: 'carla/seg_captions_train.csv' # TODO : change this to the validation path
     model_per_gpu: 2
 ROBUSTIFICATION:       
   test_conditions : [
@@ -117,16 +114,16 @@ ROBUSTIFICATION:
     'An image taken during {} weather conditions.',
     ]
   batch_size: 8
-  train_file_path : 'bdd100k/metadata_train_seg.csv' # TODO : change this to the validation path
-  val_file_path : 'bdd100k/metadata_val_seg.csv' # TODO : change this to the validation path
+  train_file_path : None # TODO : change this to the validation path
+  val_file_path : None # TODO : change this to the validation path
 SYN_DATASET_GEN:
   target_prob_soft: 0.000001
   num_synthetic_images: 5000
-  dataset_path: '/store/harsh/data/carla_synthetic_ft/' # waymo_synthetic_llava if use_llava_prompt is True # TODO : change this to the validation path
+  dataset_path: '/store/harsh/carla_data_neat/synthexpert' # waymo_synthetic_llava if use_llava_prompt is True # TODO : change this to the validation path
   segmentation: True
-  conditions_path: 'bdd100k/'
+  conditions_path: None
   use_llava_prompt: False
-  llava_prompt_path: 'bdd100k/seg_captions_train.csv' # TODO : change this to the validation path
+  llava_prompt_path: 'carla/seg_captions_train.csv' # TODO : change this to the validation path
   fid_results_path: 'lang_data_synthesis/synthesis_results_bdd/' # TODO : change this to the validation path
   fid_test_model: 'R50' # Swin-T or R50
   use_finetuned: True 
