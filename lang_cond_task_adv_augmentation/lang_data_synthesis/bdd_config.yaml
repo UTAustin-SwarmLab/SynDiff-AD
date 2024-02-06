@@ -35,7 +35,7 @@ LLAVACAPTION:
     MODELPATH: 'liuhaotian/llava-v1.5-13b'
     MODELBASE: None
     NUM_IMAGES: 'ALL' # 'ALL' or int
-    prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), lighting conditions and image quality. Don't mention the weather conditions or daytime."
+    prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), and image quality. Don't mention the weather conditions [clear or sunny, rainy, cloudy] or time [day, twilight, night]"
     conv_mode: 'llava_v1'
     batch_size: 16
     load_8bit: False
