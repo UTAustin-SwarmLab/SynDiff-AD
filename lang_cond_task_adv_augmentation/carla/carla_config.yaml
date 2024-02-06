@@ -1,9 +1,7 @@
 IMAGE:
   CARLA:
     root_dir: '/store/harsh/carla_data_neat/'
-    train_towns:
-      ["expert",
-      "synthexpert"]
+    train_towns: ["expert", "synthexpert"]
     val_towns: ["expert"]
     train_data: []
     val_data: []
@@ -104,7 +102,7 @@ LLAVACAPTION:
     batch_size: 16
     load_8bit: False
     load_4bit: True
-    num_workers: 6
+    num_workers: 0
     conditions_path: 'bdd100k/metadata_train_seg.csv' # TODO : change this to the validation path
     captions_path_multi: 'bdd100k/seg_captions_train_{}.csv' # TODO : change this to the validation path
     captions_path_single: 'bdd100k/seg_captions_train.csv' # TODO : change this to the validation path

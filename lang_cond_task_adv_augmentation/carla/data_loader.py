@@ -111,7 +111,7 @@ class CARLADataset(ExpDataset):
                             'file_name':route_dir+"/rgb_front/"+filename,
                             'mask_path': mask_route_dir+"/seg_front/"+filename,
                             'synthetic': synthetic,
-                            'conditions': conditions
+                            'condition': conditions
                         }
                         
                         self._data_list.append(data_dict)
@@ -120,7 +120,7 @@ class CARLADataset(ExpDataset):
                             'file_name':route_dir+"/rgb_left/"+filename,
                             'mask_path':  mask_route_dir+"/seg_left/"+filename,
                             'synthetic': synthetic,
-                            'conditions': conditions
+                            'condition': conditions
                         }
                         
                         self._data_list.append(data_dict)
@@ -130,11 +130,15 @@ class CARLADataset(ExpDataset):
                             'file_name':route_dir+"/rgb_right/"+filename,
                             'mask_path': mask_route_dir+"/seg_right/"+filename,
                             'synthetic': synthetic,
-                            'conditions': conditions
+                            'condition': conditions
                         }
                         self._data_list.append(data_dict)
         self._num_images = len(self._data_list)
         self.carla_init()
+        
+    @property
+    def data_keys(self):
+        return self._data_list[0].keys()
             
     def carla_init(self):
         
@@ -205,7 +209,7 @@ class CARLADataset(ExpDataset):
         if self.segmentation:
             object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
             instance_masks = object_masks.copy()
-            semantic_mask_rgb = self.get_semantic_mask(object_masks)
+            semantic_mask_rgb = self.get_semantic_mask(object_masks - 1)
         else:
             raise NotImplementedError
         
