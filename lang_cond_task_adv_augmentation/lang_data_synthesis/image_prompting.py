@@ -457,7 +457,7 @@ class LLaVACaption:
                                  self.config.LLAVACAPTION.MODELBASE,
                                  self.config.LLAVACAPTION.load_8bit,
                                  self.config.LLAVACAPTION.load_4bit,
-                                 i % self.config.LLAVACAPTION.model_per_gpu,
+                                 int(i / self.config.LLAVACAPTION.model_per_gpu),
                                  i,
                                  self.conditions_metadata,
                                  get_text_description,
