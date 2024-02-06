@@ -260,10 +260,13 @@ class LLaVACaption:
         Worker process that fetches a batch from the queue, processes it, and returns the result.
         """
         # Set the GPU for this worker
-        torch.cuda.set_device(gpu_id)
-
+        
         # Load the model in the worker
         disable_torch_init()
+        
+        tf.config.set_visible_devices([], 'GPU')
+        torch.cuda.set_device('cuda:{}'.format(gpu_id))
+        
         model_name = get_model_name_from_path(model_path)
         tokenizer, model, image_processor, _ = load_pretrained_model(
             model_path, model_base, get_model_name_from_path(model_path),
@@ -472,6 +475,7 @@ class LLaVACaption:
 
         # Feed batches to the queue
         for j, batch in tqdm(enumerate(self.dataloader), total=len(self.dataloader)):
+            
             queue.put((batch,self.config))
 
         # Add poison pills to stop the workers
