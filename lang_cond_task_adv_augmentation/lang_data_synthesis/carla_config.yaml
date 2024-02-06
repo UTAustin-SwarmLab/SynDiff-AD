@@ -99,7 +99,7 @@ LLAVACAPTION:
     batch_size: 16
     load_8bit: False
     load_4bit: True
-    num_workers: 10
+    num_workers: 6
     conditions_path: None # TODO : change this to the validation path
     captions_path_multi: 'carla/seg_captions_train_{}.csv' # TODO : change this to the validation path
     captions_path_single: 'carla/seg_captions_train.csv' # TODO : change this to the validation path
@@ -118,6 +118,7 @@ ROBUSTIFICATION:
   val_file_path : None # TODO : change this to the validation path
 SYN_DATASET_GEN:
   target_prob_soft: 0.000001
+  source_prob_soft: 0.3
   num_synthetic_images: 5000
   dataset_path: '/store/harsh/carla_data_neat/synthexpert' # waymo_synthetic_llava if use_llava_prompt is True # TODO : change this to the validation path
   segmentation: True

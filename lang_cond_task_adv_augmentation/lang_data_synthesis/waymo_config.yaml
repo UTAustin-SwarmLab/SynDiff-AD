@@ -76,6 +76,7 @@ ROBUSTIFICATION:
 
 SYN_DATASET_GEN:
   target_prob_soft: 0.00001
+  source_prob_soft: 0.3
   num_synthetic_images: 5000
   dataset_path: '/store/harsh/data/waymo_synthetic_ft/' # waymo_syntheitc_nollava if use_llava_prompt is False
   segmentation: True

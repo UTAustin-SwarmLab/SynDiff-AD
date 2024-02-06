@@ -61,6 +61,7 @@ ROBUSTIFICATION:
   val_file_path : 'bdd100k/metadata_val_seg.csv'
 SYN_DATASET_GEN:
   target_prob_soft: 0.000001
+  source_prob_soft: 0.3
   num_synthetic_images: 5000
   dataset_path: '/store/harsh/data/bdd_synthetic_ft/' # waymo_syntheitc_llava if use_llava_prompt is True
   segmentation: True
