@@ -60,7 +60,7 @@ class SyntheticAVGenerator:
             self.source_probability = self.metadata_conditions\
                 .groupby(['condition']).size() / self.dataset_length
             self.source_probability = self.source_probability.to_dict()
-            self.source_probability = {k:self.config.SYN_DATASET_GEN.target_prob_soft*v
+            self.source_probability = {k:self.config.SYN_DATASET_GEN.source_prob_soft*v
                                        for k,v in self.source_probability.items()}
             self.source_probability = {k:np.exp(v)/np.sum(np.exp(list(self.source_probability.values())))
                                        for k,v in self.source_probability.items()}
@@ -204,7 +204,7 @@ class SyntheticAVGenerator:
                                                 p=list(self.source_probability.values()))
             source_condition = self.conditions[source_condition_idx]
             t_cond_prob = deepcopy(list(self.target_probability.values()))
-            t_cond_prob[source_condition_idx] = 0
+            #t_cond_prob[source_condition_idx] = 0
             t_cond_prob = [p/sum(t_cond_prob) for p in t_cond_prob]
             # Sample a target condition from the test conditions
             target_condition = np.random.choice(self.conditions,
