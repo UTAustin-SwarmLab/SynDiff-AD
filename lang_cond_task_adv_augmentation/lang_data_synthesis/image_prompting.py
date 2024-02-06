@@ -51,7 +51,10 @@ class LLaVACaption:
         self.dataset:Dataset = dataset
     
         FILENAME = self.config.LLAVACAPTION.conditions_path 
-        self.conditions_metadata = pd.read_csv(FILENAME)
+        if not os.path.exists(FILENAME):
+            self.conditions_metadata = None
+        else:
+            self.conditions_metadata = pd.read_csv(FILENAME)
         
         if isinstance(self.dataset, WaymoDataset):
             data_dict = {
