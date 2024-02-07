@@ -39,9 +39,7 @@ class ControlNetFineTune:
         self.model.learning_rate = config.learning_rate
         self.model.sd_locked = config.sd_locked
         self.model.only_mid_control = config.only_mid_control
-        
 
-    
     def setup_checkpoint(self, 
                          config):
         
@@ -58,10 +56,16 @@ class ControlNetFineTune:
     
     def finetune_model(self):
         # Misc
-        configs = {
-            'waymo' : OmegaConf.load('lang_data_synthesis/waymo_config.yaml'),
-            'bdd' : OmegaConf.load('lang_data_synthesis/bdd_config.yaml')
-        }
+
+        if self.args.experiment == 'seg':
+            configs = {
+                'waymo' : OmegaConf.load('lang_data_synthesis/waymo_config.yaml'),
+                'bdd' : OmegaConf.load('lang_data_synthesis/bdd_config.yaml')
+            }
+        elif self.args.experiment == 'carla':
+            configs = {
+                'carla': OmegaConf.load('lang_data_synthesis/carla_config.yaml')
+            }
     
         # Switch
         # Add wandb callback logger
@@ -97,6 +101,11 @@ def parse_args():
         default=1,
         help='Number of gpus to use for training')
 
+    parser.add_argument(
+        '--experiment',
+        choices=['seg','carla', 'cliport'],
+        default='none',
+        help='Which experiment config to generate data for')
     return  parser.parse_args()
 
 

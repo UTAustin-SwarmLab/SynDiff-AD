@@ -8,6 +8,7 @@ import pandas as pd
 from omegaconf import OmegaConf
 from ControlNet.annotator.util import resize_image
 import cv2
+from argparse import ArgumentParser
 class ExpDataset(Dataset):
     
     def __init__(self) -> None:
@@ -98,7 +99,7 @@ class ExpDataset(Dataset):
         object_set = set(object_mask.flatten().tolist())
         text_description = ''
         for object in object_set:
-            if CLASSES[object] == 'undefined':
+            if CLASSES[object] == 'undefined' or CLASSES[object] == 'unlabeled':
                 continue
             text_description += CLASSES[object] + ', '
         return text_description[:-1]
@@ -160,16 +161,26 @@ class AVControlNetDataset(ExpDataset):
                             image_meta_data=image_meta_data,
                             segmentation=segmentation,
                             validation=validation)
+                self.condition_meta_data[dataset] = pd.read_csv(cfg.ROBUSTIFICATION.train_file_path)
             elif dataset == 'bdd':
                 from bdd100k.data_loader import BDD100KDataset
                 self.dataset[dataset] = BDD100KDataset(cfg.IMAGE.BDD,
                             image_meta_data=image_meta_data,
                             segmentation=segmentation,
                             validation=validation)
+                self.condition_meta_data[dataset] = pd.read_csv(cfg.ROBUSTIFICATION.train_file_path)
+            elif dataset =='carla':
+                from carla.data_loader import CARLADataset
+                self.dataset[dataset] = CARLADataset(cfg,
+                            image_meta_data=image_meta_data,
+                            segmentation=segmentation,
+                            validation=validation)
+                self.condition_meta_data[dataset] = pd.DataFrame.from_dict(
+                    self.dataset[dataset].METADATA
+                )
             else:
                 raise ValueError(f'Invalid dataset {dataset}')
-            
-            self.condition_meta_data[dataset] = pd.read_csv(cfg.ROBUSTIFICATION.train_file_path)
+                  
             prompt_file = os.path.join(cfg.SYN_DATASET_GEN.llava_prompt_path)
             self.prompt_df[dataset] = pd.read_csv(prompt_file)
             self.conditions_list.extend(self.condition_meta_data[dataset]['condition'].unique().tolist())
@@ -205,6 +216,8 @@ class AVControlNetDataset(ExpDataset):
                         condition = self.condition_meta_data[ds_name].loc[
                             (self.condition_meta_data[ds_name]['file_name'] == info['file_name'])
                         ]['condition'].values[0]
+                    elif ds_name == 'carla':
+                        condition = info['condition']
                     self._data_list[condition].append(info)
             
     
@@ -256,6 +269,14 @@ class AVControlNetDataset(ExpDataset):
             prompt = self.prompt_df[dataset].loc[
                 (data_info['file_name'] == self.prompt_df[dataset]['file_name'])
             ]['caption'].values[0]
+        elif dataset == 'carla':
+            prompt = self.prompt_df[dataset].loc[
+                (data_info['route'] == self.prompt_df[dataset]['route'])&
+                (data_info['file_name'] == self.prompt_df[dataset]['file_name'])&
+                (data_info['mask_path'] == self.prompt_df[dataset]['mask_path'])&
+                (data_info['synthetic'] == self.prompt_df[dataset]['synthetic'])&
+                (data_info['condition'] == self.prompt_df[dataset]['condition'])
+            ]['caption'].values[0]
         
         RESIZE = self.config_dict[dataset].SYNTHESIS_PARAMS.IMAGE_RESOLUTION
         camera_images = cv2.resize(camera_images, (RESIZE, RESIZE), interpolation= cv2.INTER_AREA)
@@ -270,121 +291,45 @@ class AVControlNetDataset(ExpDataset):
         return dict(jpg=camera_images, txt=prompt, hint=semantic_mask)
 
 
-class CarlaControlNetDataset(ExpDataset):
+def parse_args():
+    parser = ArgumentParser(description='Image Classification with CLIP')
     
-    def __init__(self, config_dict,
-                image_meta_data=True,
-                segmentation=True,
-                validation=False,
-                rare_class_module = False) -> None:
-        super().__init__()
-        
-        # We would write an init for both the waymo and the nuscenes datasets
-        # rare_class_module is a boolean that determines whether we want to use the rare class module or not
-        # this enables us to select the rare meta data conditions from the dataset with equal probability
-        
-        self.dataset = dict()
-        self.prompt_df = dict()
-        self.image_meta_data = image_meta_data
-        self.config_dict = config_dict
-        self.condition_meta_data = dict()
-        self.rare_class_module = rare_class_module
-        self.conditions_list = []
-        for dataset, cfg in config_dict.items():
-            if dataset == 'waymo':
-                from waymo_open_data.data_loader import WaymoDataset
-                self.dataset[dataset] = WaymoDataset(cfg.IMAGE.WAYMO,
-                            image_meta_data=image_meta_data,
-                            segmentation=segmentation,
-                            validation=validation)
-            elif dataset == 'bdd':
-                from bdd100k.data_loader import BDD100KDataset
-                self.dataset[dataset] = BDD100KDataset(cfg.IMAGE.BDD,
-                            image_meta_data=image_meta_data,
-                            segmentation=segmentation,
-                            validation=validation)
-            else:
-                raise ValueError(f'Invalid dataset {dataset}')
-            
-            self.condition_meta_data[dataset] = pd.read_csv(cfg.ROBUSTIFICATION.train_file_path)
-            prompt_file = os.path.join(cfg.SYN_DATASET_GEN.llava_prompt_path)
-            self.prompt_df[dataset] = pd.read_csv(prompt_file)
-            self.conditions_list.extend(self.condition_meta_data[dataset]['condition'].unique().tolist())
-        
-        self.conditions_list = list(set(self.conditions_list))
-        self._num_images = sum([len(ds) for ds in self.dataset.values()])
-            
-        self.av_init()
-            
-    def av_init(self):
-        raise NotImplementedError
-        
     
-    def __len__(self) -> int:
-        if not self.rare_class_module:
-            return self._num_images
-        else:
-            max_size = max([len(v) for v in self._data_list.values()])
-            return max_size * len(self._data_list)
+    parser.add_argument(
+        '--validation',
+        action='store_true',
+        default=False,
+        help='Use validation dataset')
+    parser.add_argument(
+        '--segmentation',
+        action='store_true',
+        default=False,
+        help='Enable it for the segmentation dataset')
+    parser.add_argument(
+        '--img_meta_data',
+        action = 'store_true',
+        default = False,
+        help = 'Enable it for the image meta data dataset')
     
-    # We need to return the prompt, segmentation image and the target image
-    
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # We would write a getitem for both the waymo and the nuscenes datasets
-        
-        if not self.rare_class_module:
-            if idx> self._num_images:
-                raise IndexError(f'Index {idx} out of range')
-        else:
-            if idx>max([len(v) for v in self._data_list.values()])* len(self._data_list) :
-                raise IndexError(f'Index {idx} out of range')
+    parser.add_argument(
+        '--experiment',
+        choices=['seg','carla', 'cliport'],
+        default='none',
+        help='Which experiment config to generate data for')
 
-        if not self.rare_class_module:
-            data_info = self._data_list[idx]
-        else:
-            condition = list(self._data_list.keys())[idx // max([len(v) for v in self._data_list.values()])]
-            idx_cond = idx % max([len(v) for v in self._data_list.values()])
-            data_info_idx = idx_cond % len(self._data_list[condition])
-            data_info = self._data_list[condition][data_info_idx]
-            
-        dataset = data_info['dataset']
-        
-        if self.image_meta_data:
-            camera_images, _, _,\
-            object_masks, _ = self.dataset[dataset]._load_item(data_info)
-        else:
-            camera_images, _, _,\
-            object_masks = self.dataset[dataset]._load_item(data_info)
-        
-        semantic_mask = self.dataset[dataset].get_mapped_semantic_mask(object_masks)
-        
-        if dataset == 'waymo':
-            prompt = self.prompt_df[dataset].loc[
-                (data_info['context_name'] == self.prompt_df[dataset]['context_name']) &
-                (data_info['context_frame'] == self.prompt_df[dataset]['context_frame']) &
-                (data_info['camera_id'] == self.prompt_df[dataset]['camera_id'])
-            ]['caption'].values[0]
-        elif dataset == 'bdd':
-            prompt = self.prompt_df[dataset].loc[
-                (data_info['file_name'] == self.prompt_df[dataset]['file_name'])
-            ]['caption'].values[0]
-        
-        RESIZE = self.config_dict[dataset].SYNTHESIS_PARAMS.IMAGE_RESOLUTION
-        camera_images = cv2.resize(camera_images, (RESIZE, RESIZE), interpolation= cv2.INTER_AREA)
-        #camera_images = resize_image(camera_images, RESIZE)
-        H, W, C = camera_images.shape
-            
-        semantic_mask = cv2.resize(semantic_mask, (W, H), interpolation=cv2.INTER_NEAREST)
-        semantic_mask = semantic_mask.astype(np.float32) / 255.0
-        camera_images = camera_images.astype(np.float32) / 127.5 - 1.0
-        
-        return dict(jpg=camera_images, txt=prompt, hint=semantic_mask)
+    return parser.parse_args()
 
 if __name__ == "__main__":
-    configs = {
-        'waymo' : OmegaConf.load('lang_data_synthesis/waymo_config.yaml'),
-        'bdd' : OmegaConf.load('lang_data_synthesis/bdd_config.yaml')
-    }
+    args = parse_args()
+    if args.experiment == 'seg':
+        configs = {
+            'waymo' : OmegaConf.load('lang_data_synthesis/waymo_config.yaml'),
+            'bdd' : OmegaConf.load('lang_data_synthesis/bdd_config.yaml')
+        }
+    elif args.experiment == 'carla':
+        configs = {
+            'carla': OmegaConf.load('lang_data_synthesis/carla_config.yaml')
+        }
     
     # Switch
     ds = AVControlNetDataset(configs, rare_class_module=True)

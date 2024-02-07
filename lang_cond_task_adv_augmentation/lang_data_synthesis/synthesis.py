@@ -25,6 +25,7 @@ from PIL import Image
 from lang_data_synthesis.dataset import ExpDataset
 from multiprocessing import Process
 import multiprocessing
+from carla.data_loader import CARLADataset
 class SyntheticAVGenerator:
     
     def __init__(
@@ -42,13 +43,23 @@ class SyntheticAVGenerator:
         #     self.FOLDER = config.TRAIN_DIR
         #     self.contexts_path = os.path.join(self.FOLDER, '2d_detection_training_metadata.txt')    
         
+        if isinstance(self.dataset, WaymoDataset):
+            self.dataset_type = "waymo"
+        elif isinstance(self.dataset, BDD100KDataset):
+            self.dataset_type = "bdd"
+        elif isinstance(self.dataset, CARLADataset):
+            self.dataset_type = "carla"
+        
         if not os.path.exists(self.config.SYN_DATASET_GEN.dataset_path):
             os.makedirs(self.config.SYN_DATASET_GEN.dataset_path)
             os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"img"))
-            os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"mask"))
+            if self.dataset_type is not "carla":
+                os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"mask"))
             
         VAL_FILENAME = self.config.ROBUSTIFICATION.val_file_path
         
+        # For now we compute the probabilites based the conditions in the validation set
+        # TODO: switch between trraining and validation
         if os.path.exists(VAL_FILENAME):
             self.metadata_conditions = pd.read_csv(VAL_FILENAME)
             print(self.metadata_conditions.columns)
@@ -60,19 +71,29 @@ class SyntheticAVGenerator:
             self.source_probability = self.metadata_conditions\
                 .groupby(['condition']).size() / self.dataset_length
             self.source_probability = self.source_probability.to_dict()
-            self.source_probability = {k:self.config.SYN_DATASET_GEN.source_prob_soft*v
-                                       for k,v in self.source_probability.items()}
-            self.source_probability = {k:np.exp(v)/np.sum(np.exp(list(self.source_probability.values())))
-                                       for k,v in self.source_probability.items()}
             
-            self.target_probability = {k:self.config.SYN_DATASET_GEN.target_prob_soft/v 
-                                       for k,v in self.source_probability.items()}
+            self.source_probability = {
+                k:self.config.SYN_DATASET_GEN.source_prob_soft*v
+                for k,v in self.source_probability.items()
+            }
+            self.source_probability = {
+                k:np.exp(v)/np.sum(np.exp(list(self.source_probability.values())))
+                for k,v in self.source_probability.items()
+            }
             
-            self.target_probability = {k:np.exp(v)/np.sum(np.exp(list(self.target_probability.values())))
-                                        for k,v in self.target_probability.items()}
+            self.target_probability = {
+                k:self.config.SYN_DATASET_GEN.target_prob_soft/v 
+                for k,v in self.source_probability.items()
+            }
+            
+            self.target_probability = {
+                k:np.exp(v)/np.sum(np.exp(list(self.target_probability.values())))
+                for k,v in self.target_probability.items()
+            }
             self.conditions = list(self.source_probability.keys())
         else:
-            raise Exception("File not found")
+            if self.dataset_type != "carla":
+                raise ValueError("Validation file not found")
         
         # Replace meta data conditions with those in the training dataset
         TRAIN_FILENAME = self.config.ROBUSTIFICATION.train_file_path
@@ -84,23 +105,29 @@ class SyntheticAVGenerator:
                 .groupby(['condition']).size() / self.dataset_length * 100)
         
             self.grouped_df = self.metadata_conditions.groupby(['condition'])
+
         
-        if self.config.SYN_DATASET_GEN.segmentation:
-            self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                              "metadata_seg_{}.csv".format(self.config.seed_offset))
-            self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                       "filenames_seg_{}.txt".format(self.config.seed_offset))
-        else:
-            self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                              "metadata_det.csv")
-            self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                       "filenames_det.txt")
-        dict_data = {'filename':'filename', 'condition':'condition'}
-        write_to_csv_from_dict(
-            dict_data = dict_data, 
-            csv_file_path=self.metadata_path, 
-            file_name=""
-        )
+        if self.dataset_type != "carla":
+             
+            if self.config.SYN_DATASET_GEN.segmentation:
+                
+                self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                                "metadata_seg_{}.csv".format(self.config.seed_offset))
+                self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                        "filenames_seg_{}.txt".format(self.config.seed_offset))
+            else:
+                self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                                "metadata_det.csv")
+                self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                        "filenames_det.txt")
+            
+            dict_data = {'filename':'filename', 'condition':'condition'}
+            write_to_csv_from_dict(
+                dict_data = dict_data, 
+                csv_file_path=self.metadata_path, 
+                file_name=""
+            )
+            
         self.prompt_df = None
         if self.config.SYN_DATASET_GEN.use_llava_prompt:
             self.llavafilename = os.path.join(self.config.SYN_DATASET_GEN.llava_prompt_path)
@@ -223,43 +250,77 @@ class SyntheticAVGenerator:
             # Save the synthetic image
             for i,image in enumerate(images):
                 
-                if 'context_name' in img_data.keys():
+
+                if self.dataset_type == "waymo":
+                    
                     file_name = str(img_data['context_name'])+"_"\
                     +str(img_data['context_frame'])+"_"+\
                     str(img_data['camera_id'])+"_"+\
                     str(j)+"_"+str(i)+"_"+str(self.config.seed_offset)
-                elif 'file_name' in img_data.keys():
+                    
+                elif self.dataset_type == "bdd":
+                    
                    file_name = str(img_data['file_name'])+\
                     "_"+ str(j)+"_"+str(i)+"_"+str(self.config.seed_offset)
                     
-                # file_name = str(img_data['context_name'])+"_"\
-                #     +str(img_data['context_frame'])+"_"+\
-                #     str(img_data['camera_id'])+"_"+\
-                #     str(j)+"_"+str(i)
-                cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                         "img",
-                                         file_name +".png"), image)
-                #  save the synthetic mask
-                im = Image.fromarray(obj_mask.astype(np.uint8).squeeze())
-                im.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                     "mask",
-                                     file_name+".png"))
+                elif self.dataset_type == "carla":
+                    
+                    #TODO
+                    file_name = str(img_data['file_name'])+\
+                    "_"+ str(j)+"_"+str(i)+"_"+str(self.config.seed_offset)
+                    
+                    
+                if self.dataset_type == "waymo" and self.dataset_type == "bdd":
+                    cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                            "img",
+                                            file_name +".png"), image)
+                    #  save the synthetic mask
+                    im = Image.fromarray(obj_mask.astype(np.uint8).squeeze())
+                    save_im_path = os.path.join(
+                        self.config.SYN_DATASET_GEN.dataset_path, 
+                        "mask", 
+                        file_name+".png"
+                    )
+                    im.save(save_im_path)
+                    # # Save the synthetic mask as a numpy array
+                    
+                    # Write the synthetic metadata with the target condition in a csv file
                 
-                # # Save the synthetic mask as a numpy array
-                # np.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                #                      "mask",
-                #                      file_name+".npy"), obj_mask)
+                    dict_data = {'filename':file_name, 'condition':target_condition}
+                    write_to_csv_from_dict(
+                        dict_data = dict_data, 
+                        csv_file_path=self.metadata_path, 
+                        file_name=""
+                    )
+                elif self.dataset_type == "carla":
+                    
+                    synthetic_route = img_data['route'] + "_synth" + ""
+                    synth_route_path = os.path.join(
+                        self.config.SYN_DATASET_GEN.dataset_path,
+                        img_data['route']
+                    )
+                    cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                                            "img",
+                                            file_name +".png"), image)
+                    #  save the synthetic mask
+                    im = Image.fromarray(obj_mask.astype(np.uint8).squeeze())
+                    save_im_path = os.path.join(
+                        self.config.SYN_DATASET_GEN.dataset_path, 
+                        "mask", 
+                        file_name+".png"
+                    )
+                    im.save(save_im_path)
+                    # # Save the synthetic mask as a numpy array
+                    
+                    # Write the synthetic metadata with the target condition in a csv file
                 
-                # Write the synthetic metadata with the target condition in a csv file
-                dict_data = {'filename':file_name, 'condition':target_condition}
-                write_to_csv_from_dict(
-                    dict_data = dict_data, 
-                    csv_file_path=self.metadata_path, 
-                    file_name=""
-                )
-                # with open(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                #                        "metadata.csv"), 'a') as f:
-                #     f.write(file_name+","+target_condition+"\n")
+                    dict_data = {'filename':file_name, 'condition':target_condition}
+                    write_to_csv_from_dict(
+                        dict_data = dict_data, 
+                        csv_file_path=self.metadata_path, 
+                        file_name=""
+                    )
+                
                     
                 # Write the filename in a txt file
                 with open(self.txtfilename, 'a') as f:
