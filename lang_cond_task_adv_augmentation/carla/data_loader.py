@@ -146,6 +146,7 @@ class CARLADataset(ExpDataset):
         # We refer to sensitive classes as unmapped classes and during synthesis these classes
         # will not be synthetic, we will superpose them on the synthetic image from the original class
         label_data = [
+            {"Class": "Buffer", "Color": (0, 0, 0)},
             {"Class": "Unlabeled", "Color": (0, 0, 0)},
             {"Class": "Building", "Color": (70, 70, 70)},
             {"Class": "Fence", "Color": (100, 40, 40)},
@@ -209,10 +210,9 @@ class CARLADataset(ExpDataset):
         if self.segmentation:
             object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
             instance_masks = object_masks.copy()
-            semantic_mask_rgb = self.get_semantic_mask(object_masks - 1)
+            semantic_mask_rgb = self.get_semantic_mask(object_masks)
         else:
             raise NotImplementedError
-        
         img_data = data 
 
         if self.segmentation:
@@ -269,7 +269,7 @@ if __name__ == '__main__':
             segmentation=SEGMENTATION,
             image_meta_data=IMAGE_META_DATA
         )
-
+        torch.manual_seed(0)
         dataloader = DataLoader(
             dataset, 
             batch_size=10,
