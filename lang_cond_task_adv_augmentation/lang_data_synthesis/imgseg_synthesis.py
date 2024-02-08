@@ -358,13 +358,24 @@ class ImageSynthesis:
 
             # Add more prompt keywords based on the semantics present
             
+            
             if prompt_tokens is not None and prompt_tokens['a_prompt'] is not None:
                 a_prompt += ("," + prompt_tokens['a_prompt'])
             if prompt_tokens is not None and prompt_tokens['n_prompt'] is not None:
                 n_prompt += ("," + prompt_tokens['n_prompt'])
 
-            cond = {"c_concat": [control], "c_crossattn": 
-                    [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
+            if isinstance(prompt) == str:
+                cond = {"c_concat": [control], "c_crossattn": 
+                        [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
+            elif isinstance(prompt, list):
+                if len(prompt) > num_samples:
+                    prompt = prompt[:num_samples]
+                elif len(prompt) < num_samples:
+                    prompt = prompt + [prompt[-1]] * (num_samples - len(prompt))
+                
+                cond = {"c_concat": [control], "c_crossattn": 
+                        [self.model.get_learned_conditioning([prompt[j] + ',' +a_prompt for j in range(num_samples)])]}
+                
             un_cond = {"c_concat": None if guess_mode else [control],
                         "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples)]}
             shape = (4, H // 8, W // 8)
