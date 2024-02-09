@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 from ControlNet.annotator.util import resize_image
 import cv2
 from argparse import ArgumentParser
+from torch.utils.data import DataLoader
 class ExpDataset(Dataset):
     
     def __init__(self) -> None:
@@ -339,8 +340,16 @@ if __name__ == "__main__":
     print(ds[10000]['jpg'].shape)
     print(ds[10000]['txt'])
     print(ds[10000]['hint'].shape)
-    print(ds[40000].keys())
-    print(ds[40000]['jpg'].shape)
-    print(ds[40000]['txt'])
-    print(ds[40000]['hint'].shape)
-    
+    # print(ds[40000].keys())
+    # print(ds[40000]['jpg'].shape)
+    # print(ds[40000]['txt'])
+    # print(ds[40000]['hint'].shape)
+
+
+    dataloader = DataLoader(ds, num_workers=2,
+                                batch_size=2,
+                                shuffle=True)
+    for i, data in enumerate(dataloader):
+        print(i, data['jpg'].shape, data['txt'], data['hint'].shape)
+        if i == 20:
+            break
