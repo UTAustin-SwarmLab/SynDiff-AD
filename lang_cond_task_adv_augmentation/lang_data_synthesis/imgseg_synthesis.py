@@ -364,7 +364,7 @@ class ImageSynthesis:
             if prompt_tokens is not None and prompt_tokens['n_prompt'] is not None:
                 n_prompt += ("," + prompt_tokens['n_prompt'])
 
-            if isinstance(prompt) == str:
+            if isinstance(prompt, str):
                 cond = {"c_concat": [control], "c_crossattn": 
                         [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
             elif isinstance(prompt, list):
