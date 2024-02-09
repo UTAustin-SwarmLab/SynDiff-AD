@@ -344,7 +344,7 @@ class SyntheticAVGenerator:
                     
                     
                     
-                if self.dataset_type == "waymo" and self.dataset_type == "bdd":
+                if self.dataset_type == "waymo" or self.dataset_type == "bdd":
                     cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                             "img",
                                             file_name +".png"), image)
