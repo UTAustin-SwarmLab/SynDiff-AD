@@ -26,6 +26,7 @@ from lang_data_synthesis.dataset import ExpDataset
 from multiprocessing import Process
 import multiprocessing
 from carla.data_loader import CARLADataset
+import time 
 
 class SyntheticAVGenerator:
     
@@ -422,7 +423,7 @@ def parse_args():
         action = 'store_true',
         default = False,
         help = 'Enable it for the image meta data dataset')
-        
+         
     parser.add_argument(
         '--experiment',
         choices=['waymo', 'bdd', 'carla', 'cliport'],
@@ -518,6 +519,8 @@ if __name__ == "__main__":
         
         for w in workers:
             w.start()
+            time.sleep(1.0)
+            
 
         # Collect results
         # all_captions = []
