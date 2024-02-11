@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 import torch 
 from torch.utils.data import Dataset
-
+from pdb import set_trace as bp
 
 class CARLA_points(Dataset):
     """
@@ -44,6 +44,7 @@ class CARLA_points(Dataset):
         self.command = []
         self.velocity = []
 
+
         for sub_root in root:
             preload_file = os.path.join(sub_root, 'pl_'+str(config.seq_len)+'_'+str(config.pred_len)+'.npy')
 
@@ -65,12 +66,20 @@ class CARLA_points(Dataset):
                 preload_velocity = []
 
                 # list sub-directories in root 
+                
+                    
                 root_files = os.listdir(sub_root)
                 routes = [folder for folder in root_files if not os.path.isfile(os.path.join(sub_root,folder))]
+
                 for route in routes:
                     route_dir = os.path.join(sub_root, route)
                     print(route_dir)
-                    # subtract final frames (pred_len) since there are no future waypoints
+                    
+                    if 'synth' in sub_root:
+                        gt_route_dir = os.path.join(sub_root.replace("synth",""), route.split('___')[1])
+                        print(gt_route_dir)
+                    # subtract final frames (pred_len) since 
+                    # there are no future waypoints
                     # first frame of sequence not used
                     num_seq = (len(os.listdir(route_dir+"/rgb_front/"))-config.pred_len-1)//config.seq_len
                     for seq in range(num_seq):
@@ -94,14 +103,20 @@ class CARLA_points(Dataset):
                             rights.append(route_dir+"/rgb_right/"+filename)
 
                             # semantics
-                            topdowns.append(route_dir+"/topdown/"+filename)
-                            
-                            # position
-                            with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
-                                data = json.load(read_file)
+                            if 'synth' in sub_root:
+                                topdowns.append(gt_route_dir+"/topdown/"+filename)
+                                with open(gt_route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
+                            else:
+                                topdowns.append(route_dir+"/topdown/"+filename)
+                                with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
                             xs.append(data['x'])
                             ys.append(data['y'])
                             thetas.append(data['theta'])
+                            
+                            # position
+                           
 
                         # get control value of final frame in sequence
                         preload_x_command.append(data['x_command'])
@@ -118,11 +133,17 @@ class CARLA_points(Dataset):
                             file_number = seq*config.seq_len+i+1
 
                             # semantics
-                            topdowns.append(route_dir+f"/topdown/{str(file_number).zfill(4)}.png")
-                            
-                            # position
-                            with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
-                                data = json.load(read_file)
+                            if 'synth' in sub_root:
+                                topdowns.append(gt_route_dir+"/topdown/"+f"{str(file_number).zfill(4)}.png")
+                                # position
+                                with open(gt_route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
+                            else:
+                                topdowns.append(route_dir+f"/topdown/{str(file_number).zfill(4)}.png")
+                                # position
+                                with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
+
                             xs.append(data['x'])
                             ys.append(data['y'])
 
