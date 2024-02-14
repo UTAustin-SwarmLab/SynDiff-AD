@@ -41,7 +41,7 @@ class ConditionAVTester:
             
         cfg = Config.fromfile(model_config_path)
         print(f'Config:\n{cfg.pretty_text}')
-        cfg.work_dir = test_config.work_dir + test_config.model_name + args.dir_tag
+        cfg.work_dir = test_config.work_dir + test_config.model_name + args.dir_tag + args.add_tag
         # load config
         cfg.launcher = args.launcher
 
@@ -113,7 +113,7 @@ class ConditionAVTester:
             data_dict[metric.metrics[0]+'_label'] = metric.metrics[0]+'_label'
 
             
-        self.save_filename = test_config.test_data_path  + test_config.model_name + ".csv"
+        self.save_filename = test_config.test_data_path  + test_config.model_name + args.dir_tag + args.add_tag + ".csv"
         write_to_csv_from_dict(
                     dict_data=data_dict , 
                     csv_file_path= self.save_filename,
@@ -262,6 +262,11 @@ def parse_args():
         '--dir_tag',
         default='v1',
         help='tag for new directory to save model'
+    )
+    parser.add_argument(
+        '--add_tag',
+        default='',
+        help='tag for new directory to save model for finetuned models'
     )
     # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
     # will pass the `--local-rank` parameter to `tools/train.py` instead
