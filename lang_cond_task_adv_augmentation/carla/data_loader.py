@@ -170,8 +170,8 @@ class CARLADataset(ExpDataset):
             {"Class": "Water", "Color": (45, 60, 150)},
             {"Class": "Terrain", "Color": (145, 170, 100)},
             {"Class": "Red Light", "Color": (255, 0, 0)},
-            {"Class": "Green Light", "Color": (0, 255, 0)},
             {"Class": "Yellow Light", "Color": (255, 0, 0)},
+            {"Class": "Green Light", "Color": (0, 255, 0)},
             {"Class": "Stop Sign", "Color": (220, 220, 0)}   
         ]        
         self.CLASSES_TO_PALLETE = {data["Class"]: data["Color"] for data in label_data}
