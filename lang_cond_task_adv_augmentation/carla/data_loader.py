@@ -145,7 +145,7 @@ class CARLADataset(ExpDataset):
         # We refer to sensitive classes as unmapped classes and during synthesis these classes
         # will not be synthetic, we will superpose them on the synthetic image from the original class
         label_data = [
-            {"Class": "Buffer", "Color": (0, 0, 0)},
+            # {"Class": "Buffer", "Color": (0, 0, 0)},
             {"Class": "Unlabeled", "Color": (0, 0, 0)},
             {"Class": "Building", "Color": (70, 70, 70)},
             {"Class": "Fence", "Color": (100, 40, 40)},
@@ -181,7 +181,8 @@ class CARLADataset(ExpDataset):
         
         # We physically list out the classes that we dont want to synthetically map
         self.UNMAPPED_CLASSES=[
-            'Unlabeled','TrafficSign','TrafficLight','Stop Sign','Red Light','Green Light','Yellow Light'
+            'Unlabeled','TrafficSign','TrafficLight','Stop Sign',
+            'Red Light','Green Light','Yellow Light', 'RoadLine'
         ]
         
         UNMAPPED_CLASSES = self.UNMAPPED_CLASSES

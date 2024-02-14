@@ -26,6 +26,7 @@ from lang_data_synthesis.dataset import ExpDataset
 from multiprocessing import Process
 import multiprocessing
 from carla.data_loader import CARLADataset
+import time 
 
 class SyntheticAVGenerator:
     
@@ -266,6 +267,11 @@ class SyntheticAVGenerator:
                                  interpolation=cv2.INTER_NEAREST)
             if not self.config.SYN_DATASET_GEN.use_finetuned:
                 syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
+                
+            # For carla we ensure the traffic lights are road lines are preserved from original image image
+            if self.dataset_type == "carla":
+                syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
+                
             outputs[j+1] = syn_img
         
         # Return the synthetic image, object mask 
@@ -422,7 +428,7 @@ def parse_args():
         action = 'store_true',
         default = False,
         help = 'Enable it for the image meta data dataset')
-        
+         
     parser.add_argument(
         '--experiment',
         choices=['waymo', 'bdd', 'carla', 'cliport'],
@@ -518,6 +524,8 @@ if __name__ == "__main__":
         
         for w in workers:
             w.start()
+            time.sleep(1.0)
+            
 
         # Collect results
         # all_captions = []

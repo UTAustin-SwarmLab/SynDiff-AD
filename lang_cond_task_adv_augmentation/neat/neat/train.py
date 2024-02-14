@@ -14,7 +14,7 @@ from config import GlobalConfig
 from architectures import AttentionField
 from data import CARLA_points
 from utils import iou
-
+from pdb import set_trace as bp
 parser = argparse.ArgumentParser()
 parser.add_argument('--id', type=str, default='default_conf', help='Unique experiment identifier.')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use')
@@ -23,6 +23,7 @@ parser.add_argument('--val_every', type=int, default=1, help='Validation frequen
 parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
 parser.add_argument('--workers', type=int, default=8, help='Dataloading workers per GPU')
 parser.add_argument('--logdir', type=str, default='log', help='Directory to log data to.')
+parser.add_argument('--preload_from_id', type=str, default=None, help='Checkpoint of base model to preload from.')
 
 
 class Engine(object):
@@ -199,8 +200,13 @@ class Engine(object):
 def main():
 	# get args
 	args = parser.parse_args()
+ 
+	if args.preload_from_id is not None:
+		args.preload_dir = os.path.join(args.logdir, args.preload_from_id)
+		print("preloading from", args.preload_dir)
+  
 	args.logdir = os.path.join(args.logdir, args.id)
-
+	
 	# create logdir
 	if not os.path.isdir(args.logdir):
 		os.makedirs(args.logdir)
@@ -220,6 +226,7 @@ def main():
 									shuffle=False, num_workers=args.workers, pin_memory=True)
 
 	# model
+	#bp()
 	model = AttentionField(conf, args.device)
 
 	parameters = list(model.encoder.parameters()) + list(model.decoder.parameters())
@@ -227,6 +234,16 @@ def main():
 	optimizer = optim.AdamW(parameters, lr=conf.lr)
 	trainer = Engine(conf)
 
+	if args.preload_from_id is not None and os.path.isdir(args.logdir):
+		logfile = os.path.join(args.preload_dir, 'recent.log')
+		if os.path.isfile(logfile):
+			print('PreLoading checkpoint from ' + args.preload_dir)
+
+			# load checkpoint
+			model.encoder.load_state_dict(torch.load(os.path.join(args.preload_dir, 'encoder.pth')))
+			model.decoder.load_state_dict(torch.load(os.path.join(args.preload_dir, 'decoder.pth')))
+
+			optimizer.load_state_dict(torch.load(os.path.join(args.preload_dir, 'recent_optim.pth')))
 	if os.path.isdir(args.logdir):
 		logfile = os.path.join(args.logdir, 'recent.log')
 		if os.path.isfile(logfile):
@@ -245,7 +262,8 @@ def main():
 			model.decoder.load_state_dict(torch.load(os.path.join(args.logdir, 'decoder.pth')))
 
 			optimizer.load_state_dict(torch.load(os.path.join(args.logdir, 'recent_optim.pth')))
-
+	
+	
 	# log args
 	with open(os.path.join(args.logdir, 'args.txt'), 'w') as f:
 		json.dump(args.__dict__, f, indent=2)
