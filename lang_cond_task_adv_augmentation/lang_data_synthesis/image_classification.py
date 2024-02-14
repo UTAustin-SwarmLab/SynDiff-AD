@@ -202,7 +202,7 @@ def parse_args():
         
     parser.add_argument(
         '--experiment',
-        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        choices=['waymo', 'bdd', 'cliport'],
         default='none',
         help='Which experiment config to generate data for')
 

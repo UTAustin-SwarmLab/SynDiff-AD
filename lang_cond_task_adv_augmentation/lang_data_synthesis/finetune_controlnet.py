@@ -1,4 +1,4 @@
-import ControlNet.config
+import ControlNet.config:
 import sys
 import os
 sys.path.append(os.path.join(os.getcwd(),'ControlNet/'))
@@ -74,8 +74,7 @@ class ControlNetFineTune:
         
         
         dataset = AVControlNetDataset(configs, rare_class_module=self.args.rct)
-
-        dataloader = DataLoader(dataset, num_workers=4,
+        dataloader = DataLoader(dataset, num_workers=self.args.num_workers,
                                 batch_size=self.config.batch_size,
                                 shuffle=True)
 
@@ -106,6 +105,11 @@ def parse_args():
         choices=['seg','carla', 'cliport'],
         default='none',
         help='Which experiment config to generate data for')
+    parser.add_argument(
+        '--num_workers',
+        type=int,
+        default=2,
+        help='Number of workers per gpu for loading data')
     return  parser.parse_args()
 
 

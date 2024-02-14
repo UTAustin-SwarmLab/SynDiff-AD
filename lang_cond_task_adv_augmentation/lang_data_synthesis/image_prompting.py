@@ -73,6 +73,7 @@ class LLaVACaption:
             data_dict = {
                 k:k for k in self.dataset.data_keys
             }
+            data_dict['caption'] = 'caption'
             
         if config.LLAVACAPTION.num_workers > 0:
             for j in range(self.config.LLAVACAPTION.num_workers):

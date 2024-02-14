@@ -71,68 +71,67 @@ class CARLADataset(ExpDataset):
             if not os.path.exists(sub_root):
                 continue
             
-            preload_file = os.path.join(sub_root, 'pl_'+str(carla_config.seq_len)+'_'+str(carla_config.pred_len)+'.npy')
+            #preload_file = os.path.join(sub_root, 'pl_'+str(carla_config.seq_len)+'_'+str(carla_config.pred_len)+'.npy')
             if 'synth' in sub_root:
                 synthetic = True
                 
             else:
                 synthetic = False
             
-            # dump to npy if no preload
-            if not os.path.exists(preload_file):
-                # list sub-directories in root 
+            root_files = os.listdir(sub_root)
+            routes = [folder for folder in root_files if not os.path.isfile(os.path.join(sub_root,folder))]
+            for route in routes:
+                route_dir = os.path.join(sub_root, route)
+                print(route_dir)
                 
-                root_files = os.listdir(sub_root)
-                routes = [folder for folder in root_files if not os.path.isfile(os.path.join(sub_root,folder))]
-                for route in routes:
-                    route_dir = os.path.join(sub_root, route)
-                    print(route_dir)
-
-                    num_seq = len(os.listdir(route_dir+"/rgb_front/"))
-                    for seq in range(num_seq):
-                        
-                        filename = f"{str(seq).zfill(4)}.png"
-                        if synthetic:
-                            # if synthetic, the masks for the images will be found in the 
-                            # default expert data folder
-                            # route will be named synth___route___1, synth___route___2 etc
-                            mask_home_root = root.split('___')[1]
-                            mask_route_dir = route_dir.replace('synth', '')
-                            mask_route_dir = mask_route_dir.replace(route, mask_home_root)
-                        else:
-                            mask_route_dir = route_dir  
-                        
-                        # Open measurements.json to load weather condition
-                        with open(route_dir + f"/measurements/{str(seq).zfill(4)}.json", "r") as read_file:
-                            data = json.load(read_file)
-                            conditions = data['weather']
-                        data_dict = {
-                            'route': route,
-                            'file_name':route_dir+"/rgb_front/"+filename,
-                            'mask_path': mask_route_dir+"/seg_front/"+filename,
-                            'synthetic': synthetic,
-                            'condition': conditions
-                        }
-                        
-                        self._data_list.append(data_dict)
-                        data_dict = {
-                            'route': route,
-                            'file_name':route_dir+"/rgb_left/"+filename,
-                            'mask_path':  mask_route_dir+"/seg_left/"+filename,
-                            'synthetic': synthetic,
-                            'condition': conditions
-                        }
-                        
-                        self._data_list.append(data_dict)
-                        
-                        data_dict = {
-                            'route': route,
-                            'file_name':route_dir+"/rgb_right/"+filename,
-                            'mask_path': mask_route_dir+"/seg_right/"+filename,
-                            'synthetic': synthetic,
-                            'condition': conditions
-                        }
-                        self._data_list.append(data_dict)
+                if not os.path.exists(route_dir+"/rgb_front/"):
+                    continue
+                
+                num_seq = len(os.listdir(route_dir+"/rgb_front/"))
+                for seq in range(num_seq):
+                    
+                    filename = f"{str(seq).zfill(4)}.png"
+                    if synthetic:
+                        # if synthetic, the masks for the images will be found in the 
+                        # default expert data folder
+                        # route will be named synth___route___1, synth___route___2 etc
+                        mask_home_root = root.split('___')[1]
+                        mask_route_dir = route_dir.replace('synth', '')
+                        mask_route_dir = mask_route_dir.replace(route, mask_home_root)
+                    else:
+                        mask_route_dir = route_dir  
+                    
+                    # Open measurements.json to load weather condition
+                    with open(route_dir + f"/measurements/{str(seq).zfill(4)}.json", "r") as read_file:
+                        data = json.load(read_file)
+                        conditions = data['weather']
+                    data_dict = {
+                        'route': route,
+                        'file_name':route_dir+"/rgb_front/"+filename,
+                        'mask_path': mask_route_dir+"/seg_front/"+filename,
+                        'synthetic': synthetic,
+                        'condition': conditions
+                    }
+                    
+                    self._data_list.append(data_dict)
+                    data_dict = {
+                        'route': route,
+                        'file_name':route_dir+"/rgb_left/"+filename,
+                        'mask_path':  mask_route_dir+"/seg_left/"+filename,
+                        'synthetic': synthetic,
+                        'condition': conditions
+                    }
+                    
+                    self._data_list.append(data_dict)
+                    
+                    data_dict = {
+                        'route': route,
+                        'file_name':route_dir+"/rgb_right/"+filename,
+                        'mask_path': mask_route_dir+"/seg_right/"+filename,
+                        'synthetic': synthetic,
+                        'condition': conditions
+                    }
+                    self._data_list.append(data_dict)
         self._num_images = len(self._data_list)
         self.carla_init()
         
@@ -146,6 +145,7 @@ class CARLADataset(ExpDataset):
         # We refer to sensitive classes as unmapped classes and during synthesis these classes
         # will not be synthetic, we will superpose them on the synthetic image from the original class
         label_data = [
+            {"Class": "Buffer", "Color": (0, 0, 0)},
             {"Class": "Unlabeled", "Color": (0, 0, 0)},
             {"Class": "Building", "Color": (70, 70, 70)},
             {"Class": "Fence", "Color": (100, 40, 40)},
@@ -209,10 +209,9 @@ class CARLADataset(ExpDataset):
         if self.segmentation:
             object_masks = np.array(Image.open(ann_path)).astype(np.uint8)
             instance_masks = object_masks.copy()
-            semantic_mask_rgb = self.get_semantic_mask(object_masks - 1)
+            semantic_mask_rgb = self.get_semantic_mask(object_masks)
         else:
             raise NotImplementedError
-        
         img_data = data 
 
         if self.segmentation:
@@ -269,7 +268,7 @@ if __name__ == '__main__':
             segmentation=SEGMENTATION,
             image_meta_data=IMAGE_META_DATA
         )
-
+        torch.manual_seed(0)
         dataloader = DataLoader(
             dataset, 
             batch_size=10,

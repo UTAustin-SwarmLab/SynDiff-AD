@@ -26,12 +26,15 @@ from lang_data_synthesis.dataset import ExpDataset
 from multiprocessing import Process
 import multiprocessing
 from carla.data_loader import CARLADataset
+
 class SyntheticAVGenerator:
     
     def __init__(
         self,
         source_dataset,
-        config) -> None:
+        config,
+        carla_image_bounds = None # Only for CARLA
+        ) -> None:
 
         self.config = config
         self.dataset = source_dataset
@@ -42,7 +45,7 @@ class SyntheticAVGenerator:
         # else:
         #     self.FOLDER = config.TRAIN_DIR
         #     self.contexts_path = os.path.join(self.FOLDER, '2d_detection_training_metadata.txt')    
-        
+        self.carla_image_bounds = carla_image_bounds
         if isinstance(self.dataset, WaymoDataset):
             self.dataset_type = "waymo"
         elif isinstance(self.dataset, BDD100KDataset):
@@ -52,8 +55,8 @@ class SyntheticAVGenerator:
         
         if not os.path.exists(self.config.SYN_DATASET_GEN.dataset_path):
             os.makedirs(self.config.SYN_DATASET_GEN.dataset_path)
-            os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"img"))
-            if self.dataset_type is not "carla":
+            if self.dataset_type != "carla":
+                os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"img"))
                 os.makedirs(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,"mask"))
             
         VAL_FILENAME = self.config.ROBUSTIFICATION.val_file_path
@@ -93,7 +96,7 @@ class SyntheticAVGenerator:
             self.conditions = list(self.source_probability.keys())
         else:
             if self.dataset_type != "carla":
-                raise ValueError("Validation file not found")
+                raise ValueError("Validation file does not exist")
         
         # Replace meta data conditions with those in the training dataset
         TRAIN_FILENAME = self.config.ROBUSTIFICATION.train_file_path
@@ -105,21 +108,37 @@ class SyntheticAVGenerator:
                 .groupby(['condition']).size() / self.dataset_length * 100)
         
             self.grouped_df = self.metadata_conditions.groupby(['condition'])
-
+            #self.conditions = list(self.grouped_df.groups.keys())
         
+        if self.dataset_type == "carla":
+            self.metadata_conditions = pd.DataFrame.from_dict(self.dataset.METADATA)
+            self.dataset_length = len(self.metadata_conditions)
+            print(self.metadata_conditions\
+                .groupby(['condition']).size() / self.dataset_length * 100)
+            self.grouped_df = self.metadata_conditions.groupby(['condition'])
+            self.conditions = list(self.grouped_df.groups.keys())
+            
         if self.dataset_type != "carla":
              
             if self.config.SYN_DATASET_GEN.segmentation:
                 
-                self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                                "metadata_seg_{}.csv".format(self.config.seed_offset))
-                self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                        "filenames_seg_{}.txt".format(self.config.seed_offset))
+                self.metadata_path = os.path.join(
+                    self.config.SYN_DATASET_GEN.dataset_path,
+                    "metadata_seg_{}.csv".format(self.config.seed_offset)
+                )
+                self.txtfilename = os.path.join(
+                    self.config.SYN_DATASET_GEN.dataset_path,
+                    "filenames_seg_{}.txt".format(self.config.seed_offset)
+                )
             else:
-                self.metadata_path = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                                "metadata_det.csv")
-                self.txtfilename = os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                        "filenames_det.txt")
+                self.metadata_path = os.path.join(
+                    self.config.SYN_DATASET_GEN.dataset_path,
+                    "metadata_det.csv"
+                )
+                self.txtfilename = os.path.join(
+                    self.config.SYN_DATASET_GEN.dataset_path,
+                    "filenames_det.txt"
+                )
             
             dict_data = {'filename':'filename', 'condition':'condition'}
             write_to_csv_from_dict(
@@ -150,17 +169,21 @@ class SyntheticAVGenerator:
         object_masks, img_data = self.dataset[source_idx]
         
         prompt_tokens = {}
-        prompt_tokens['a_prompt'] = "Must contain " + ExpDataset.get_text_description(object_masks,
-                                                                                        self.dataset.CLASSES)
+        prompt_tokens['a_prompt'] = "Must contain " + ExpDataset.get_text_description(
+            object_masks,
+            self.dataset.CLASSES
+        )
         #prompt_tokens['n_prompt'] = "Must not contain " + self.dataset.get_text_description(object_masks)
         prompt_tokens['n_prompt'] = ""
         semantic_mapped_rgb_mask = self.dataset.get_mapped_semantic_mask(object_masks)
         invalid_mask = self.dataset.get_unmapped_mask(object_masks)
-        weather, day = target_condition.split(',')
+        if self.dataset_type != "carla":
+            weather, day = target_condition.split(',')
         
+
         if self.config.SYN_DATASET_GEN.use_llava_prompt:
             
-            if 'context_name' in img_data.keys():
+            if self.dataset_type == "waymo":
                 prompt = self.prompt_df.loc[
                     (img_data['context_name'] == self.prompt_df['context_name']) &
                     (img_data['context_frame'] == self.prompt_df['context_frame']) &
@@ -171,38 +194,70 @@ class SyntheticAVGenerator:
                     (img_data['context_frame'] == self.metadata_conditions['context_frame']) &
                     (img_data['camera_id'] == self.metadata_conditions['camera_id'])
                 ]['condition'].values[0]
-            elif 'file_name' in img_data.keys():
+            elif self.dataset_type == "bdd":
                 prompt = self.prompt_df.loc[
                     (img_data['file_name'] == self.prompt_df['context_name'])
                 ]['caption'].values[0]
                 source_condition = self.metadata_conditions.loc[
                     (img_data['file_name'] == self.metadata_conditions['context_name'])
                 ]['condition'].values[0]
+            elif self.dataset_type == 'carla':
+                source_condition = img_data['condition']
+                prompt = self.prompt_df.loc[
+                    (img_data['route'] == self.prompt_df['route'])&
+                    (img_data['file_name'] == self.prompt_df['file_name'])&
+                    (img_data['mask_path'] == self.prompt_df['mask_path'])&
+                    (img_data['synthetic'] == self.prompt_df['synthetic'])&
+                    (img_data['condition'] == self.prompt_df['condition'])
+                ]['caption'].values[0]
                 
+            
             #source_condition = self.metadata_conditions.iloc[source_idx]['condition']
-            source_weather, source_day = source_condition.split(',')
-            
-            prompt = prompt.replace(source_weather, weather)
-            prompt = prompt.replace(source_day, day)
-            
-            if 'context_name' in img_data.keys() or 'file_name' in img_data.keys():
-                # remove all the words associated with the source condition
+            if self.dataset_type == "waymo" or self.dataset_type == "bdd":
+                source_weather, source_day = source_condition.split(',')
+                
+                prompt = prompt.replace(source_weather, weather)
+                prompt = prompt.replace(source_day, day)
+                
+                if 'context_name' in img_data.keys() or 'file_name' in img_data.keys():
+                    # remove all the words associated with the source condition
 
-                prompt = prompt.replace(source_day.lower(), day)   
-                
-                if 'y' in source_weather:
-                    prompt = prompt.replace(source_weather[:-1].lower(), weather)
-                    prompt = prompt.replace(source_weather[:-1], weather)
-                else:
-                    prompt = prompt.replace(source_weather.lower(), weather)
-                
+                    prompt = prompt.replace(source_day.lower(), day)   
+                    
+                    if 'y' in source_weather:
+                        prompt = prompt.replace(source_weather[:-1].lower(), weather)
+                        prompt = prompt.replace(source_weather[:-1], weather)
+                    else:
+                        prompt = prompt.replace(source_weather.lower(), weather)
+            elif self.dataset_type == "carla":   
+                if isinstance(target_condition, list):
+                    prompt_list = []
+                    for condition in target_condition:
+                        p = deepcopy(prompt)    
+                        prompt_list.append(p.replace(source_condition, condition))
+                    prompt = prompt_list
+                elif isinstance(target_condition, str):
+                    prompt = prompt.replace(source_condition, target_condition)
         else:
-            prompt = 'This image is taken during {} time of the day and features {} weather. '.format(day, weather)
+            if self.dataset_type == "waymo" or self.dataset_type == "bdd":
+                prompt = 'This image is taken during {} time of the day and features {} weather. '.format(day, weather)
+            elif self.dataset_type == "carla":
+                if isinstance(target_condition, list):
+                    prompt_list = []
+                    for condition in target_condition:
+                        p = 'This image is taken during {} weather and day condition.'.format(condition)
+                        prompt_list.append(p)
+                    prompt = prompt_list
+                elif isinstance(target_condition, str):
+                    prompt = 'This image is taken during {} weather and day condition.'.format(target_condition)
+        
         with torch.no_grad():
-            outputs = self.synthesizer.run_model(camera_images.copy(), 
-                                seg_mask=[semantic_mapped_rgb_mask.copy()],
-                                prompt = prompt,
-                                prompt_tokens=prompt_tokens)
+            outputs = self.synthesizer.run_model(
+                camera_images.copy(), 
+                seg_mask=[semantic_mapped_rgb_mask.copy()],
+                prompt = prompt,
+                prompt_tokens=prompt_tokens
+            )
         
         results = outputs[1:]
         for j,syn_img in enumerate(results):
@@ -217,18 +272,15 @@ class SyntheticAVGenerator:
         
         return outputs[1:], object_masks, img_data
         
+    def prepare_source_target(self, synth_image_id):
         
-    def generate_synthetic_dataset(self):
-        '''
-            This function would generate a synthetic dataset based on the test conditions
-            and the model's performance on the test conditions.
-        '''
-        
-        for j in range(self.config.SYN_DATASET_GEN.num_synthetic_images):
-            np.random.seed(j*100 + self.config.seed_offset)
+        if self.dataset_type == "waymo" or self.dataset_type == "bdd":
+            np.random.seed(synth_image_id*100 + self.config.seed_offset)
             # Sample a source conditions from the test conditions
-            source_condition_idx= np.random.choice(np.arange(len(self.conditions)),
-                                                p=list(self.source_probability.values()))
+            source_condition_idx= np.random.choice(
+                np.arange(len(self.conditions)),
+                p=list(self.source_probability.values())
+            )
             source_condition = self.conditions[source_condition_idx]
             t_cond_prob = deepcopy(list(self.target_probability.values()))
             #t_cond_prob[source_condition_idx] = 0
@@ -238,6 +290,33 @@ class SyntheticAVGenerator:
                                                 p=t_cond_prob)
 
             dataset_idx = self.sample_source_image(source_condition)
+        elif self.dataset_type == "carla":
+            np.random.seed(synth_image_id*100 + self.config.seed_offset)
+            
+            source_condition = self.dataset.METADATA[synth_image_id]['condition']
+            #t_cond_prob[source_condition_idx] = 0
+            # Sample a target condition from the test conditions
+            target_condition = np.random.choice(self.conditions,
+                                                size = self.config.SYNTHESIS_PARAMS.NUMSAMPLES,
+                                                )
+
+            dataset_idx = synth_image_id + self.carla_image_bounds[0]
+        
+        return dataset_idx, source_condition, target_condition
+    
+    def generate_synthetic_dataset(self):
+        '''
+            This function would generate a synthetic dataset based on the test conditions
+            and the model's performance on the test conditions.
+        '''
+        if self.dataset_type == "waymo" or self.dataset_type == "bdd":   
+            num_images = self.config.SYN_DATASET_GEN.num_synthetic_images
+        elif self.dataset_type == "carla":
+            num_images = self.carla_image_bounds[1] - self.carla_image_bounds[0]
+        for j in range(num_images):
+            
+            dataset_idx, source_condition, target_condition = self.prepare_source_target(j)
+            
             print("Iteration {} : Source condition:{} Target: {} Idx :{}".format(j,
                                                                           source_condition,
                                                                           target_condition,
@@ -263,14 +342,9 @@ class SyntheticAVGenerator:
                    file_name = str(img_data['file_name'])+\
                     "_"+ str(j)+"_"+str(i)+"_"+str(self.config.seed_offset)
                     
-                elif self.dataset_type == "carla":
-                    
-                    #TODO
-                    file_name = str(img_data['file_name'])+\
-                    "_"+ str(j)+"_"+str(i)+"_"+str(self.config.seed_offset)
                     
                     
-                if self.dataset_type == "waymo" and self.dataset_type == "bdd":
+                if self.dataset_type == "waymo" or self.dataset_type == "bdd":
                     cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                             "img",
                                             file_name +".png"), image)
@@ -292,40 +366,44 @@ class SyntheticAVGenerator:
                         csv_file_path=self.metadata_path, 
                         file_name=""
                     )
+                                    # Write the filename in a txt file
+                    with open(self.txtfilename, 'a') as f:
+                        f.write(file_name+"\n")                
+                
                 elif self.dataset_type == "carla":
                     
-                    synthetic_route = img_data['route'] + "_synth" + ""
+                    # Note that the route folder name is modified based on the source folder
+                    # for the synthetic image, this allows us to generate different variations
+                    # of the route without having to modify the ground truth semantic content
+                    # of the route and the associated control and plan commands. 
+                    # We dont store the copy metadata for carla precisely for this reason.
+                    synthetic_route = "synth___"+ img_data['route'] + "___v{}".format(i)
+                    
                     synth_route_path = os.path.join(
                         self.config.SYN_DATASET_GEN.dataset_path,
+                        synthetic_route
+                    )
+                    
+                    if not os.path.exists(synth_route_path):
+                        os.makedirs(synth_route_path)
+                    
+                    img_path = img_data['file_name']
+                    #img_path = img_path.replace(img_data['route'], synthetic_route)
+                    source_folder_name = os.path.join(
+                        img_path.split(img_data['route'])[0],
                         img_data['route']
                     )
-                    cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
-                                            "img",
-                                            file_name +".png"), image)
+                                                      
+                    img_subpath = img_path.split(img_data['route'])[1].split("/")[1]
+                    
+                    if not os.path.exists(os.path.join(synth_route_path, img_subpath)):
+                        os.makedirs(os.path.join(synth_route_path, img_subpath))
+                        
+                    img_path = img_path.replace(source_folder_name, synth_route_path)
+                    
+                    cv2.imwrite(img_path, image)
                     #  save the synthetic mask
-                    im = Image.fromarray(obj_mask.astype(np.uint8).squeeze())
-                    save_im_path = os.path.join(
-                        self.config.SYN_DATASET_GEN.dataset_path, 
-                        "mask", 
-                        file_name+".png"
-                    )
-                    im.save(save_im_path)
-                    # # Save the synthetic mask as a numpy array
-                    
-                    # Write the synthetic metadata with the target condition in a csv file
-                
-                    dict_data = {'filename':file_name, 'condition':target_condition}
-                    write_to_csv_from_dict(
-                        dict_data = dict_data, 
-                        csv_file_path=self.metadata_path, 
-                        file_name=""
-                    )
-                
-                    
-                # Write the filename in a txt file
-                with open(self.txtfilename, 'a') as f:
-                    f.write(file_name+"\n")                
-                
+
 def parse_args():
     parser = ArgumentParser(description='Image Classification with CLIP')
 
@@ -347,7 +425,7 @@ def parse_args():
         
     parser.add_argument(
         '--experiment',
-        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        choices=['waymo', 'bdd', 'carla', 'cliport'],
         default='none',
         help='Which experiment config to generate data for')
     
@@ -391,14 +469,37 @@ def process(args, worker_id = None):
                             image_meta_data=IMAGE_META_DATA,
                             segmentation=SEGMENTATION,
                             validation=VALIDATION)
-    elif args.experiment == 'plan':
-        raise NotImplementedError
+    elif args.experiment == 'carla':
+        dataset = CARLADataset(config,
+                            image_meta_data=IMAGE_META_DATA,
+                            segmentation=SEGMENTATION,
+                            validation=VALIDATION)
     elif args.experiment == 'cliport':
         raise NotImplementedError
     else:
         raise ValueError("Experiment not supported")
-    dataset_gen = SyntheticAVGenerator(source_dataset=dataset,
-                                    config=config)
+    
+    if args.experiment == 'waymo' or args.experiment == 'bdd':
+        dataset_gen = SyntheticAVGenerator(
+            source_dataset=dataset,
+            config=config
+        )
+    elif args.experiment == 'carla':
+        
+        if worker_id is None:
+            worker_id = 0
+            
+        if worker_id == args.num_process - 1:
+            carla_image_bounds = [worker_id*int(len(dataset)/args.num_process), 
+                                  len(dataset)]
+        else:
+            carla_image_bounds = [worker_id*int(len(dataset)/args.num_process), 
+                                  (worker_id+1)*int(len(dataset)/args.num_process)]
+        dataset_gen = SyntheticAVGenerator(
+            source_dataset=dataset,
+            config=config,
+            carla_image_bounds=carla_image_bounds
+        )
     dataset_gen.generate_synthetic_dataset()
     
 if __name__ == "__main__":

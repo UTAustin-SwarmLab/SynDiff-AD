@@ -28,7 +28,7 @@ class AVTrain:
         model_config_path = train_config.model_config_path + train_config.model_name + '.py'
         cfg = Config.fromfile(model_config_path)
         print(f'Config:\n{cfg.pretty_text}')
-        cfg.work_dir = train_config.work_dir + train_config.model_name + args.dir_tag
+        cfg.work_dir = train_config.work_dir + train_config.model_name + args.dir_tag + args.add_tag
 
         # load config
         cfg.launcher = args.launcher
@@ -130,7 +130,11 @@ def parse_args():
         default='v3',
         help='tag for new directory to save model'
     )
-    
+    parser.add_argument(
+        '--add_tag',
+        default='',
+        help='tag for new directory to save model for finetuned models'
+    )
     # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
     # will pass the `--local-rank` parameter to `tools/train.py` instead
     # of `--local_rank`.
