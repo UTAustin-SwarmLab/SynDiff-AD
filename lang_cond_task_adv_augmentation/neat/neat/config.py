@@ -4,13 +4,13 @@ class GlobalConfig:
     """ base architecture configurations """
 
 	# Data
-    root_dir = '/is/rg/avg/kchitta/carla9-10_data/2021/apv3'
-    train_towns = ['Town01', 'Town02', 'Town03', 'Town04', 'Town05', 'Town06', 'Town07', 'Town10']
-    val_towns = ['Town01_long', 'Town02_long', 'Town03_long', 'Town04_long', 'Town05_long', 'Town06_long']
+    root_dir = '/store/harsh/carla_data_neat/'
+    train_towns = ["expert", "synthexpert"]
+    val_towns = ["expert"]
     train_data, val_data = [], []
     for town in train_towns:
         train_data.append(os.path.join(root_dir, town))
-        train_data.append(os.path.join(root_dir, town+'_small'))
+        # train_data.append(os.path.join(root_dir, town+'_small'))
     for town in val_towns:
         val_data.append(os.path.join(root_dir, town))
 
@@ -66,6 +66,7 @@ class GlobalConfig:
     3,    # yellow light
     4,    # green light
     0,    # stop sign
+    2,    # Another road line marker
     ]
 
     points_per_class = 64 # number of scene points sampled per class for perception training
