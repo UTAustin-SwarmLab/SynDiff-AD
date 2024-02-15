@@ -297,7 +297,7 @@ class SyntheticAVGenerator:
 
             dataset_idx = self.sample_source_image(source_condition)
         elif self.dataset_type == "carla":
-            np.random.seed(synth_image_id*100 + self.config.seed_offset)
+            np.random.seed((synth_image_id +  self.carla_image_bounds[0])*100 + self.config.seed_offset)
             
             source_condition = self.dataset.METADATA[synth_image_id]['condition']
             #t_cond_prob[source_condition_idx] = 0
