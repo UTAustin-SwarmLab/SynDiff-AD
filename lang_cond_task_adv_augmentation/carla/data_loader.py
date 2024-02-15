@@ -183,7 +183,7 @@ class CARLADataset(ExpDataset):
         # We physically list out the classes that we dont want to synthetically map
         self.UNMAPPED_CLASSES=[
             'Unlabeled','TrafficSign','TrafficLight','Stop Sign',
-            'Red Light','Green Light','Yellow Light', 'RoadLine',"Unknown"
+            'Red Light','Green Light','Yellow Light', 'RoadLine','RoadLine2'
         ]
         
         UNMAPPED_CLASSES = self.UNMAPPED_CLASSES
