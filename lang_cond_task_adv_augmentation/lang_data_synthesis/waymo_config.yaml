@@ -51,10 +51,10 @@ LLAVACAPTION:
     NUM_IMAGES: 'ALL' # 'ALL' or int
     prompt: "Give me a description on the objects {} and their relationships with respect to each other. Describe the background in terms of the scene (urban or rural), and image quality. Don't mention the weather conditions [clear or sunny, rainy, cloudy] or time [day, twilight, night]"
     conv_mode: 'llava_v1'
-    batch_size: 2
+    batch_size: 16
     load_8bit: False
     load_4bit: True
-    num_workers: 2
+    num_workers: 6
     conditions_path: 'waymo_open_data/waymo_env_conditions_train.csv'
     captions_path_multi: 'waymo_open_data/waymo_captions_train_{}.csv'
     captions_path_single: 'waymo_open_data/waymo_captions_train.csv'
@@ -86,3 +86,4 @@ SYN_DATASET_GEN:
   fid_results_path: 'lang_data_synthesis/synthesis_results/'
   fid_test_model: 'R50' # Swin-T or R50
   use_finetuned: True # Whether to use finetuned controlnet or original controlnet
+  class_meta_data: 'waymo_open_data/waymo_class_metadata.csv'
