@@ -208,7 +208,7 @@ class SyntheticAVGenerator:
             # source_group = sub_data_grouped.get_group(source_condition)
             # source_index = source_group.sample().index[0]
             # data = source_group.iloc[source_index==source_group.index].to_dict()
-            # source_data = dict()
+            source_data = dict()
             for k,v in data.items():
                 if k in self.classes_dataset:
                     if k == semantic_class:
