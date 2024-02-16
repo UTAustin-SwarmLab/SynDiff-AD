@@ -4,6 +4,7 @@ class GlobalConfig:
     """ base architecture configurations """
 
 	# Data
+
     root_dir = '/store/harsh/carla_data_neat/'
     train_towns = ["expert", "synthexpert"]
     val_towns = ["expert"]
