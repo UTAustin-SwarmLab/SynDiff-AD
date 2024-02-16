@@ -29,10 +29,8 @@ class AVTrain:
         cfg = Config.fromfile(model_config_path)
         print(f'Config:\n{cfg.pretty_text}')
         
-        if args.rct:
-            cfg.work_dir = train_config.work_dir + train_config.model_name + 'rct' + args.dir_tag + args.add_tag
-        else:
-            cfg.work_dir = train_config.work_dir + train_config.model_name + args.dir_tag + args.add_tag
+
+        cfg.work_dir = train_config.work_dir + train_config.model_name + args.dir_tag + args.add_tag
             
         # load config
         cfg.launcher = args.launcher

@@ -1,7 +1,7 @@
 IMAGE:
   CARLA:
     root_dir: '/store/harsh/carla_data_neat/'
-    train_towns: ["expert", "synthexpert"]
+    train_towns: ["expert"]
     val_towns: ["expert"]
     train_data: []
     val_data: []
@@ -99,11 +99,11 @@ LLAVACAPTION:
     batch_size: 16
     load_8bit: False
     load_4bit: True
-    num_workers: 6
+    num_workers: 1
     conditions_path: None # TODO : change this to the validation path
     captions_path_multi: 'carla/seg_captions_train_{}.csv' # TODO : change this to the validation path
     captions_path_single: 'carla/seg_captions_train.csv' # TODO : change this to the validation path
-    model_per_gpu: 2
+    model_per_gpu: 1
 ROBUSTIFICATION:       
   test_conditions : [
     ["ClearMorning", "CloudyMorning", "RainMorning", "ClearNight", "CloudyNight", "RainNight","ClearTwilight", "CloudyTwilight", "RainTwilight"]
@@ -123,7 +123,7 @@ SYN_DATASET_GEN:
   dataset_path: '/store/harsh/carla_data_neat/synthexpert' # waymo_synthetic_llava if use_llava_prompt is True # TODO : change this to the validation path
   segmentation: True
   conditions_path: None
-  use_llava_prompt: False
+  use_llava_prompt:  True
   llava_prompt_path: 'carla/seg_captions_train.csv' # TODO : change this to the validation path
   fid_results_path: 'lang_data_synthesis/synthesis_results_bdd/' # TODO : change this to the validation path
   fid_test_model: 'R50' # Swin-T or R50

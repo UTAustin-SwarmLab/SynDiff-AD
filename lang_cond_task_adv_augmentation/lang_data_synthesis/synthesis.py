@@ -54,6 +54,10 @@ class SyntheticAVGenerator:
         elif isinstance(self.dataset, CARLADataset):
             self.dataset_type = "carla"
         
+        if self.config.SYN_DATASET_GEN.class_eq:
+            self.config.SYN_DATASET_GEN.dataset_path = \
+                self.config.SYN_DATASET_GEN.dataset_path.replace("_ft","_ft_ceq")
+        
         if not os.path.exists(self.config.SYN_DATASET_GEN.dataset_path):
             os.makedirs(self.config.SYN_DATASET_GEN.dataset_path)
             if self.dataset_type != "carla":
@@ -111,6 +115,24 @@ class SyntheticAVGenerator:
             self.grouped_df = self.metadata_conditions.groupby(['condition'])
             #self.conditions = list(self.grouped_df.groups.keys())
         
+        if self.config.SYN_DATASET_GEN.class_eq:
+            CLASS_METADATA_FILENAME = self.config.SYN_DATASET_GEN.class_meta_data
+            if os.path.exists(CLASS_METADATA_FILENAME):
+                self.class_metadata = pd.read_csv(CLASS_METADATA_FILENAME)
+                self.classes_dataset = self.dataset.CLASSES
+                print(self.class_metadata.columns)
+                # Get per class occurences
+                print(self.class_metadata[self.classes_dataset].sum(axis=0)/ self.dataset_length)
+                
+                # Merge the class metadata with the dataset metadata
+                self.metadata_all = pd.merge(
+                    self.class_metadata,
+                    self.metadata_conditions,
+                )
+                self.metadata_all_grouped = self.metadata_all.groupby(['condition'])
+                print(self.metadata_all.columns)
+                
+                    
         if self.dataset_type == "carla":
             self.metadata_conditions = pd.DataFrame.from_dict(self.dataset.METADATA)
             self.dataset_length = len(self.metadata_conditions)
@@ -159,15 +181,51 @@ class SyntheticAVGenerator:
     
     def sample_source_image(self, source_condition):  
         # Get a random index corresponding to the source condition
-        source_index = self.grouped_df.get_group(source_condition).sample().index[0]
+        if not self.config.SYN_DATASET_GEN.class_eq:
+            source_index = self.grouped_df.get_group(source_condition).sample().index[0]
+            source_data = self.metadata_conditions.iloc[source_index].to_dict()
+        else:
+            # Sample a class
+            sub_data_group = self.metadata_all_grouped.get_group(source_condition)
+            # Choose class
+            bool = False
+            while not bool:
+                class_index = np.random.choice(
+                    np.arange(len(self.classes_dataset))
+                )
+                semantic_class = self.classes_dataset[class_index]
+                sub_data = sub_data_group[sub_data_group[semantic_class] == 1]
+                if len(sub_data) > 0:
+                    bool = True
+            
+            # Sample random index from sub_data
+            idx = np.random.choice(
+                np.arange(len(sub_data))
+            )
+            data = sub_data.iloc[idx].to_dict()
+            
+            # sub_data_grouped = sub_data.groupby(['condition'])
+            # source_group = sub_data_grouped.get_group(source_condition)
+            # source_index = source_group.sample().index[0]
+            # data = source_group.iloc[source_index==source_group.index].to_dict()
+            source_data = dict()
+            for k,v in data.items():
+                if k in self.classes_dataset:
+                    if k == semantic_class:
+                        assert list(v.values())[0] == 1
+                else:
+                    source_data[k] =list(v.values())[0]
+            # Sample a class from the list of source conditions
+            
+            
         # Get the data from the source index
         # source_data = self.metadata_conditions.iloc[source_index]
-        return source_index
+        return source_data
         
-    def generate_synthetic_image(self, source_idx, target_condition):
+    def generate_synthetic_image(self, source_data, target_condition):
            
         camera_images, _, _,\
-        object_masks, img_data = self.dataset[source_idx]
+        object_masks, img_data = self.dataset._load_item(source_data)
         
         prompt_tokens = {}
         prompt_tokens['a_prompt'] = "Must contain " + ExpDataset.get_text_description(
@@ -226,7 +284,7 @@ class SyntheticAVGenerator:
                     prompt = prompt.replace(source_day.lower(), day)   
                     
                     if 'y' in source_weather:
-                        prompt = prompt.replace(source_weather[:-1].lower(), weather)
+                        prompt = prompt.replace(' '+source_weather[:-1].lower(), ' '+weather)
                         prompt = prompt.replace(source_weather[:-1], weather)
                     else:
                         prompt = prompt.replace(source_weather.lower(), weather)
@@ -295,11 +353,11 @@ class SyntheticAVGenerator:
             target_condition = np.random.choice(self.conditions,
                                                 p=t_cond_prob)
 
-            dataset_idx = self.sample_source_image(source_condition)
+            dataset_info = self.sample_source_image(source_condition)
         elif self.dataset_type == "carla":
-            np.random.seed(synth_image_id*100 + self.config.seed_offset)
+            np.random.seed((synth_image_id +  self.carla_image_bounds[0])*100 + self.config.seed_offset)
             
-            source_condition = self.dataset.METADATA[synth_image_id]['condition']
+            source_condition = self.dataset.METADATA[synth_image_id + self.carla_image_bounds[0]]['condition']
             #t_cond_prob[source_condition_idx] = 0
             # Sample a target condition from the test conditions
             target_condition = np.random.choice(self.conditions,
@@ -307,8 +365,9 @@ class SyntheticAVGenerator:
                                                 )
 
             dataset_idx = synth_image_id + self.carla_image_bounds[0]
+            dataset_info = self.dataset.METADATA[dataset_idx]
         
-        return dataset_idx, source_condition, target_condition
+        return dataset_info, source_condition, target_condition
     
     def generate_synthetic_dataset(self):
         '''
@@ -446,6 +505,12 @@ def parse_args():
         default=1,
         help='How many parallel processes' 
     )
+    parser.add_argument(
+        '--class_eq',
+        default=False,
+        action='store_true',
+        help='Whether to sample classes equally'
+    )
     return  parser.parse_args()
 
 
@@ -486,12 +551,15 @@ def process(args, worker_id = None):
         raise ValueError("Experiment not supported")
     
     if args.experiment == 'waymo' or args.experiment == 'bdd':
+        config.SYN_DATASET_GEN.class_eq = args.class_eq
         dataset_gen = SyntheticAVGenerator(
             source_dataset=dataset,
             config=config
         )
     elif args.experiment == 'carla':
-        
+        if args.class_eq:
+            raise ValueError("Class eq not supported for carla")
+        config.SYN_DATASET_GEN.class_eq = False
         if worker_id is None:
             worker_id = 0
             

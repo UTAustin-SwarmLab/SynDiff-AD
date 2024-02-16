@@ -164,15 +164,16 @@ class CARLADataset(ExpDataset):
             {"Class": "Bridge", "Color": (150, 100, 100)},
             {"Class": "RailTrack", "Color": (230, 150, 140)},
             {"Class": "GuardRail", "Color": (180, 165, 180)},
-            {"Class": "TrafficLight", "Color": (250, 170, 30)},
+            {"Class": "TrafficLight", "Color":  (250, 170, 30)},
             {"Class": "Static", "Color": (110, 190, 160)},
             {"Class": "Dynamic", "Color": (170, 120, 50)},
             {"Class": "Water", "Color": (45, 60, 150)},
             {"Class": "Terrain", "Color": (145, 170, 100)},
             {"Class": "Red Light", "Color": (255, 0, 0)},
-            {"Class": "Green Light", "Color": (0, 255, 0)},
             {"Class": "Yellow Light", "Color": (255, 0, 0)},
-            {"Class": "Stop Sign", "Color": (220, 220, 0)}   
+            {"Class": "Green Light", "Color": (0, 255, 0)},
+            {"Class": "Stop Sign", "Color": (220, 220, 0)} , 
+            {"Class": "RoadLine2", "Color": (157, 234, 50)}
         ]        
         self.CLASSES_TO_PALLETE = {data["Class"]: data["Color"] for data in label_data}
         self.CLASSES = list(self.CLASSES_TO_PALLETE.keys())
@@ -182,7 +183,7 @@ class CARLADataset(ExpDataset):
         # We physically list out the classes that we dont want to synthetically map
         self.UNMAPPED_CLASSES=[
             'Unlabeled','TrafficSign','TrafficLight','Stop Sign',
-            'Red Light','Green Light','Yellow Light', 'RoadLine'
+            'Red Light','Green Light','Yellow Light', 'RoadLine','RoadLine2'
         ]
         
         UNMAPPED_CLASSES = self.UNMAPPED_CLASSES

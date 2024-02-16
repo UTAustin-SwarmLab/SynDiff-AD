@@ -71,3 +71,4 @@ SYN_DATASET_GEN:
   fid_results_path: 'lang_data_synthesis/synthesis_results_bdd/'
   fid_test_model: 'R50' # Swin-T or R50
   use_finetuned: True 
+  class_meta_data: 'bdd100k/bdd_class_metadata.csv'
