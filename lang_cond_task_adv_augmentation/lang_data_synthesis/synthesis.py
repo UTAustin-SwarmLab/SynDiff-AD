@@ -129,6 +129,7 @@ class SyntheticAVGenerator:
                     self.class_metadata,
                     self.metadata_conditions,
                 )
+                self.metadata_all_grouped = self.metadata_all.groupby(['condition'])
                 print(self.metadata_all.columns)
                 
                     
@@ -185,15 +186,28 @@ class SyntheticAVGenerator:
             source_data = self.metadata_conditions.iloc[source_index].to_dict()
         else:
             # Sample a class
-            class_index = np.random.choice(
-                np.arange(len(self.classes_dataset))
+            sub_data_group = self.metadata_all_grouped.get_group(source_condition)
+            # Choose class
+            bool = False
+            while not bool:
+                class_index = np.random.choice(
+                    np.arange(len(self.classes_dataset))
+                )
+                semantic_class = self.classes_dataset[class_index]
+                sub_data = sub_data_group[sub_data_group[semantic_class] == 1]
+                if len(sub_data) > 0:
+                    bool = True
+            
+            # Sample random index from sub_data
+            idx = np.random.choice(
+                np.arange(len(sub_data))
             )
-            semantic_class = self.classes_dataset[class_index]
-            sub_data = self.metadata_all[self.metadata_all[semantic_class] == 1]
-            sub_data_grouped = sub_data.groupby(['condition'])
-            source_group = sub_data_grouped.get_group(source_condition)
-            source_index = source_group.sample().index[0]
-            data = source_group.iloc[source_index==source_group.index].to_dict()
+            data = sub_data.iloc[idx].to_dict()
+            
+            # sub_data_grouped = sub_data.groupby(['condition'])
+            # source_group = sub_data_grouped.get_group(source_condition)
+            # source_index = source_group.sample().index[0]
+            # data = source_group.iloc[source_index==source_group.index].to_dict()
             source_data = dict()
             for k,v in data.items():
                 if k in self.classes_dataset:
