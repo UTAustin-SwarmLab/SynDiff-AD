@@ -55,7 +55,8 @@ class SyntheticAVGenerator:
             self.dataset_type = "carla"
         
         if self.config.SYN_DATASET_GEN.class_eq:
-            self.config.SYN_DATASET_GEN.dataset_path += "_class_eq"
+            self.config.SYN_DATASET_GEN.dataset_path = \
+                self.config.SYN_DATASET_GEN.dataset_path.replace("_ft","_ft_ceq")
         
         if not os.path.exists(self.config.SYN_DATASET_GEN.dataset_path):
             os.makedirs(self.config.SYN_DATASET_GEN.dataset_path)
@@ -269,7 +270,7 @@ class SyntheticAVGenerator:
                     prompt = prompt.replace(source_day.lower(), day)   
                     
                     if 'y' in source_weather:
-                        prompt = prompt.replace(source_weather[:-1].lower(), weather)
+                        prompt = prompt.replace(' '+source_weather[:-1].lower(), ' '+weather)
                         prompt = prompt.replace(source_weather[:-1], weather)
                     else:
                         prompt = prompt.replace(source_weather.lower(), weather)
