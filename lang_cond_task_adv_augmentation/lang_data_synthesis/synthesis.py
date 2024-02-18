@@ -328,8 +328,7 @@ class SyntheticAVGenerator:
             if not self.config.SYN_DATASET_GEN.use_finetuned:
                 syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
                 
-            # For carla we ensure the traffic lights are road lines are preserved from original image image
-            if self.dataset_type == "carla":
+            # For carla we ensure the traffic lights are road lines are preserved from original image image            if self.dataset_type == "carla":
                 syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
                 
             outputs[j+1] = syn_img
@@ -365,6 +364,7 @@ class SyntheticAVGenerator:
             target_condition = np.random.choice(self.conditions,
                                                 size = self.config.SYNTHESIS_PARAMS.NUMSAMPLES,
                                                 )
+            target_condition = target_condition.tolist()
 
             dataset_idx = synth_image_id + self.carla_image_bounds[0]
             dataset_info = self.dataset.METADATA[dataset_idx]
