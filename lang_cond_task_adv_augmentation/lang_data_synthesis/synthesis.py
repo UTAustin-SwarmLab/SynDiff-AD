@@ -329,6 +329,7 @@ class SyntheticAVGenerator:
                 syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
                 
             # For carla we ensure the traffic lights are road lines are preserved from original image image            if self.dataset_type == "carla":
+            if self.dataset_type == "carla":
                 syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
                 
             outputs[j+1] = syn_img
