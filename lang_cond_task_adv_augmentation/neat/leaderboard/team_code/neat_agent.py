@@ -50,6 +50,7 @@ class MultiTaskAgent(autonomous_agent.AutonomousAgent):
 		self.wall_start = time.time()
 		self.initialized = False
 
+		print('Loading from', path_to_conf_file)
 		args_file = open(os.path.join(path_to_conf_file, 'args.txt'), 'r')
 		self.args = json.load(args_file)
 		args_file.close()

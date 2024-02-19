@@ -12,8 +12,8 @@ export CHALLENGE_TRACK_CODENAME=SENSORS
 export DEBUG_CHALLENGE=0
 
 # Server Ports
-export PORT=2400 # same as the carla server port
-export TM_PORT=8010 # port for traffic manager, required when spawning multiple servers/clients
+export PORT=2500 # same as the carla server port
+export TM_PORT=8130 # port for traffic manager, required when spawning multiple servers/clients
 
 # Evaluation Setup
 export ROUTES=leaderboard/data/evaluation_routes/eval_routes_weathers.xml # routes file
@@ -23,8 +23,8 @@ export RESUME=0 # resume evaluation from partial results file
 
 # Agent Paths
 export TEAM_AGENT=leaderboard/team_code/neat_agent.py # agent script
-export TEAM_CONFIG=./log/expert_v2 # model checkpoint (not required for auto_pilot)
-export CHECKPOINT_ENDPOINT=/home/hg22723/projects/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation/neat/results/neat_eval.json # output results file
+export TEAM_CONFIG=./log/synth_neat_v1 # model checkpoint (not required for auto_pilot)
+export CHECKPOINT_ENDPOINT=/home/hg22723/projects/lang-cond-task-adv-augmentation/lang_cond_task_adv_augmentation/neat/results/synth_neat_eval_v1.json # output results file
 #export SAVE_PATH=/store/harsh/carla_data_neat/expert # path for saving episodes (comment to disable)
 
 python3 ${LEADERBOARD_ROOT}/leaderboard/leaderboard_evaluator.py \

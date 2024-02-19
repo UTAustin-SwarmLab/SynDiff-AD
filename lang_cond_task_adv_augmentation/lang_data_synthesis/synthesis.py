@@ -223,7 +223,33 @@ class SyntheticAVGenerator:
         # Get the data from the source index
         # source_data = self.metadata_conditions.iloc[source_index]
         return source_data
+    
+    def generate_prompt(self, prompt, source_condition, target_condition):
+        if self.dataset_type == "waymo" or self.dataset_type == "bdd":
+            
+            weather, day = target_condition.split(',') 
+            source_weather, source_day = source_condition.split(',')
+            
+            prompt = prompt.replace(source_weather, weather)
+            prompt = prompt.replace(source_day, day)
+            # remove all the words associated with the source condition
+
+            prompt = prompt.replace(source_day.lower(), day)   
+            
+            if 'y' in source_weather:
+                prompt = prompt.replace(' '+source_weather[:-1].lower(), ' '+weather)
+                if 'y' in weather:
+                    prompt = prompt.replace(source_weather[:-1], weather[:-1])
+                else:
+                    prompt = prompt.replace(source_weather[:-1], weather)
+            else:
+                prompt = prompt.replace(source_weather.lower(), weather)
+        elif self.dataset_type == "carla":
+            prompt = prompt.replace(source_condition, target_condition)
         
+        return prompt
+            
+            
     def generate_synthetic_image(self, source_data, target_condition):
            
         camera_images, _, _,\
@@ -238,10 +264,7 @@ class SyntheticAVGenerator:
         prompt_tokens['n_prompt'] = ""
         semantic_mapped_rgb_mask = self.dataset.get_mapped_semantic_mask(object_masks)
         invalid_mask = self.dataset.get_unmapped_mask(object_masks)
-        if self.dataset_type != "carla":
-            weather, day = target_condition.split(',')
         
-
         if self.config.SYN_DATASET_GEN.use_llava_prompt:
             
             if self.dataset_type == "waymo":
@@ -272,36 +295,61 @@ class SyntheticAVGenerator:
                     (img_data['condition'] == self.prompt_df['condition'])
                 ]['caption'].values[0]
                 
-            
-            #source_condition = self.metadata_conditions.iloc[source_idx]['condition']
-            if self.dataset_type == "waymo" or self.dataset_type == "bdd":
-                source_weather, source_day = source_condition.split(',')
-                
-                prompt = prompt.replace(source_weather, weather)
-                prompt = prompt.replace(source_day, day)
-                
-                if 'context_name' in img_data.keys() or 'file_name' in img_data.keys():
-                    # remove all the words associated with the source condition
 
-                    prompt = prompt.replace(source_day.lower(), day)   
+            if isinstance(target_condition, list):
+                p = deepcopy(prompt)
+                prompt_list = []
+                for condition in target_condition:
+                    p = deepcopy(prompt)    
+                    prompt_list.append(self.generate_prompt(p, source_condition, condition))
+                prompt = prompt_list
+            elif isinstance(target_condition, str):
+                prompt = self.generate_prompt(prompt, source_condition, target_condition)
+                
+            #source_condition = self.metadata_conditions.iloc[source_idx]['condition']
+            # if self.dataset_type == "waymo" or self.dataset_type == "bdd":
+                
+            #     if isinstance(target_condition, list):
                     
-                    if 'y' in source_weather:
-                        prompt = prompt.replace(' '+source_weather[:-1].lower(), ' '+weather)
-                        prompt = prompt.replace(source_weather[:-1], weather)
-                    else:
-                        prompt = prompt.replace(source_weather.lower(), weather)
-            elif self.dataset_type == "carla":   
-                if isinstance(target_condition, list):
-                    prompt_list = []
-                    for condition in target_condition:
-                        p = deepcopy(prompt)    
-                        prompt_list.append(p.replace(source_condition, condition))
-                    prompt = prompt_list
-                elif isinstance(target_condition, str):
-                    prompt = prompt.replace(source_condition, target_condition)
+            #     else:
+            #         source_weather, source_day = source_condition.split(',')
+                    
+            #         prompt = prompt.replace(source_weather, weather)
+            #         prompt = prompt.replace(source_day, day)
+                    
+            #         if 'context_name' in img_data.keys() or 'file_name' in img_data.keys():
+            #             # remove all the words associated with the source condition
+
+            #             prompt = prompt.replace(source_day.lower(), day)   
+                        
+            #             if 'y' in source_weather:
+            #                 prompt = prompt.replace(' '+source_weather[:-1].lower(), ' '+weather)
+            #                 prompt = prompt.replace(source_weather[:-1], weather)
+            #             else:
+            #                 prompt = prompt.replace(source_weather.lower(), weather)
+            # elif self.dataset_type == "carla":   
+            #     if isinstance(target_condition, list):
+            #         prompt_list = []
+            #         for condition in target_condition:
+            #             p = deepcopy(prompt)    
+            #             prompt_list.append(p.replace(source_condition, condition))
+            #         prompt = prompt_list
+            #     elif isinstance(target_condition, str):
+            #         prompt = prompt.replace(source_condition, target_condition)
         else:
             if self.dataset_type == "waymo" or self.dataset_type == "bdd":
-                prompt = 'This image is taken during {} time of the day and features {} weather. '.format(day, weather)
+                if isinstance(target_condition, list):
+                    prompt = []
+                    for condition in target_condition:
+                        weather, day = condition.split(',')
+                        p = 'This image is taken during {} time of the day and\
+                        features {} weather. '.format(day, weather)
+                        prompt.append(p)
+                elif isinstance(target_condition, str):
+                    weather, day = target_condition.split(',')
+                    prompt = 'This image is taken during {} time of the day and\
+                    features {} weather. '.format(day, weather)
+                
             elif self.dataset_type == "carla":
                 if isinstance(target_condition, list):
                     prompt_list = []
@@ -328,7 +376,7 @@ class SyntheticAVGenerator:
             if not self.config.SYN_DATASET_GEN.use_finetuned:
                 syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
                 
-            # For carla we ensure the traffic lights are road lines are preserved from original image image
+            # For carla we ensure the traffic lights are road lines are preserved from original image image            if self.dataset_type == "carla":
             if self.dataset_type == "carla":
                 syn_img[invalid_mask.squeeze()] = camera_images[invalid_mask.squeeze()]
                 
@@ -353,7 +401,9 @@ class SyntheticAVGenerator:
             t_cond_prob = [p/sum(t_cond_prob) for p in t_cond_prob]
             # Sample a target condition from the test conditions
             target_condition = np.random.choice(self.conditions,
-                                                p=t_cond_prob)
+                                                p=t_cond_prob,
+                                                size = self.config.SYNTHESIS_PARAMS.NUMSAMPLES)
+            target_condition = target_condition.tolist()
 
             dataset_info = self.sample_source_image(source_condition)
         elif self.dataset_type == "carla":
@@ -365,6 +415,7 @@ class SyntheticAVGenerator:
             target_condition = np.random.choice(self.conditions,
                                                 size = self.config.SYNTHESIS_PARAMS.NUMSAMPLES,
                                                 )
+            target_condition = target_condition.tolist()
 
             dataset_idx = synth_image_id + self.carla_image_bounds[0]
             dataset_info = self.dataset.METADATA[dataset_idx]
