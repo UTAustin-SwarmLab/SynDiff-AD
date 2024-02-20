@@ -463,7 +463,8 @@ class SyntheticAVGenerator:
                     
                     
                 if self.dataset_type == "waymo" or self.dataset_type == "bdd":
-                    cv2.imwrite(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
+                    pil_img = Image.fromarray(image)
+                    pil_img.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                             "img",
                                             file_name +".png"), image)
                     #  save the synthetic mask
@@ -518,8 +519,8 @@ class SyntheticAVGenerator:
                         os.makedirs(os.path.join(synth_route_path, img_subpath))
                         
                     img_path = img_path.replace(source_folder_name, synth_route_path)
-                    
-                    cv2.imwrite(img_path, image)
+                    pil_img = Image.fromarray(image)
+                    pil_img.save(img_path)
                     #  save the synthetic mask
 
 def parse_args():
