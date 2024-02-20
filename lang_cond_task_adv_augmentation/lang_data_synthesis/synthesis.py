@@ -80,14 +80,14 @@ class SyntheticAVGenerator:
                 .groupby(['condition']).size() / self.dataset_length
             self.source_probability = self.source_probability.to_dict()
             
-            self.source_probability = {
-                k:self.config.SYN_DATASET_GEN.source_prob_soft*v
-                for k,v in self.source_probability.items()
-            }
-            self.source_probability = {
-                k:np.exp(v)/np.sum(np.exp(list(self.source_probability.values())))
-                for k,v in self.source_probability.items()
-            }
+            # self.source_probability = {
+            #     k:self.config.SYN_DATASET_GEN.source_prob_soft*v
+            #     for k,v in self.source_probability.items()
+            # }
+            # self.source_probability = {
+            #     k:np.exp(v)/np.sum(np.exp(list(self.source_probability.values())))
+            #     for k,v in self.source_probability.items()
+            # }
             
             self.target_probability = {
                 k:self.config.SYN_DATASET_GEN.target_prob_soft/v 
