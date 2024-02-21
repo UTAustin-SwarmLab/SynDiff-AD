@@ -466,7 +466,7 @@ class SyntheticAVGenerator:
                     pil_img = Image.fromarray(image)
                     pil_img.save(os.path.join(self.config.SYN_DATASET_GEN.dataset_path,
                                             "img",
-                                            file_name +".png"), image)
+                                            file_name +".png"))
                     #  save the synthetic mask
                     im = Image.fromarray(obj_mask.astype(np.uint8).squeeze())
                     save_im_path = os.path.join(
