@@ -68,6 +68,10 @@ class CARLA_points(Dataset):
                 for route in routes:
                     route_dir = os.path.join(sub_root, route)
                     print(route_dir)
+                    
+                    if 'synth' in sub_root:
+                        gt_route_dir = os.path.join(sub_root.replace("synth",""), route.split('___')[1])
+                        print(gt_route_dir)
                     # subtract final frames (pred_len) since there are no future waypoints
                     # first frame of sequence not used
                     num_seq = (len(os.listdir(route_dir+"/rgb_front/"))-config.pred_len-1)//config.seq_len
@@ -92,7 +96,15 @@ class CARLA_points(Dataset):
                             rights.append(route_dir+"/rgb_right/"+filename)
 
                             # semantics
-                            topdowns.append(route_dir+"/topdown/"+filename)
+                            # semantics
+                            if 'synth' in sub_root:
+                                topdowns.append(gt_route_dir+"/topdown/"+filename)
+                                with open(gt_route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
+                            else:
+                                topdowns.append(route_dir+"/topdown/"+filename)
+                                with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
                             
                             # position
                             with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:

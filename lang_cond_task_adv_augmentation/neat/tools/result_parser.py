@@ -108,22 +108,26 @@ def main():
             daytime = combined[-1]
             route_matching[route.attrib["id"]]={'town':route.attrib["town"],
                                             'weather': weather,
-                                                "daytime": daytime}
+                                                "daytime": daytime,
+                                                'weather_daytime': weather+'-'+daytime}
     else:
         for route in root.iter('route'):
             route_matching[route.attrib["id"]]={'town':route.attrib["town"],
                                             'weather': "Clear",
-                                                "daytime": "Noon"}
+                                                "daytime": "Noon",
+                                                'weather_daytime': "Clear"+'-'+"Noon"}
     
     _, _, filenames = next(walk(args.results))
 
-    # lists to aggregate multiple json files
-    route_evaluation = []
-    total_score_labels = []
-    total_score_values = []
+
 
     # aggregate files
     for f in filenames:
+        # lists to aggregate multiple json files
+        print(f)
+        route_evaluation = []
+        total_score_labels = []
+        total_score_values = []
         with open(os.path.join(args.results,f)) as json_file:
             evaluation_data = json.load(json_file)
 
@@ -134,152 +138,172 @@ def main():
             total_score_labels = evaluation_data["labels"]
             total_score_values += [[float(score)*len(eval_data) for score in total_scores]]
                 
-    total_score_values = np.array(total_score_values)
-    total_score_values = total_score_values.sum(axis=0)/len(route_evaluation)
+        total_score_values = np.array(total_score_values)
+        total_score_values = total_score_values.sum(axis=0)/len(route_evaluation)
 
-    # dict to extract unique identity of route in case of repetitions
-    route_to_id = {}
-    for route in route_evaluation:
-        route_to_id[route["route_id"]] = ''.join(i for i in route["route_id"] if i.isdigit())
+        # dict to extract unique identity of route in case of repetitions
+        route_to_id = {}
+        for route in route_evaluation:
+            route_to_id[route["route_id"]] = ''.join(i for i in route["route_id"] if i.isdigit())
 
-    # build table of relevant information
-    total_score_info = [{"label":label, "value":value} for label,value in zip(total_score_labels,total_score_values)]
-    route_scenarios = [{"route":route["route_id"],
-                        "town":route_matching[route_to_id[route["route_id"]]]["town"],
-                        "weather": route_matching[route_to_id[route["route_id"]]]["weather"],
-                        "daytime": route_matching[route_to_id[route["route_id"]]]["daytime"],
-                        "duration": route["meta"]["duration_game"],
-                        "length": route["meta"]["route_length"],
-                        "score": route["scores"]["score_composed"],
-                        "completion":route["scores"]["score_route"],
-                        "status": route["status"],
-                        "infractions": [(key,
-                                        len(item),
-                                        [get_infraction_coords(description) for description in item]) 
-                                        for key,item in route["infractions"].items()]} 
-                    for route in route_evaluation]
+        # build table of relevant information
+        total_score_info = [{"label":label, "value":value} for label,value in zip(total_score_labels,total_score_values)]
+        route_scenarios = [{"route":route["route_id"],
+                            "town":route_matching[route_to_id[route["route_id"]]]["town"],
+                            "weather": route_matching[route_to_id[route["route_id"]]]["weather"],
+                            "daytime": route_matching[route_to_id[route["route_id"]]]["daytime"],
+                            "weather_daytime": route_matching[route_to_id[route["route_id"]]]["weather_daytime"],
+                            "duration": route["meta"]["duration_game"],
+                            "length": route["meta"]["route_length"],
+                            "score": route["scores"]["score_composed"],
+                            "completion":route["scores"]["score_route"],
+                            "status": route["status"],
+                            "infractions": [(key,
+                                            len(item),
+                                            [get_infraction_coords(description) for description in item]) 
+                                            for key,item in route["infractions"].items()]} 
+                        for route in route_evaluation]
 
-    # compute aggregated statistics and table for each filter
-    filters = ["route","town","weather","daytime","status"]
-    evaluation_filtered = {}
+        # compute aggregated statistics and table for each filter
+        filters = ["route","town","weather","daytime","status","weather_daytime"]
+        evaluation_filtered = {}
 
-    for filter in filters:
-        subcategories = np.unique(np.array([scenario[filter] for scenario in route_scenarios]))
-        route_scenarios_per_subcategory = {}
-        evaluation_per_subcategory = {}
-        for subcategory in subcategories:
-            route_scenarios_per_subcategory[subcategory]=[]
-            evaluation_per_subcategory[subcategory] = {}
-        for scenario in route_scenarios:
-            route_scenarios_per_subcategory[scenario[filter]].append(scenario)
-        for subcategory in subcategories:
-            scores = np.array([scenario["score"] for scenario in route_scenarios_per_subcategory[subcategory]])
-            completions = np.array([scenario["completion"] for scenario in route_scenarios_per_subcategory[subcategory]])
-            durations = np.array([scenario["duration"] for scenario in route_scenarios_per_subcategory[subcategory]])
-            lengths = np.array([scenario["length"] for scenario in route_scenarios_per_subcategory[subcategory]])
+        for filter in filters:
+            subcategories = np.unique(np.array([scenario[filter] for scenario in route_scenarios]))
+            route_scenarios_per_subcategory = {}
+            evaluation_per_subcategory = {}
+            for subcategory in subcategories:
+                route_scenarios_per_subcategory[subcategory]=[]
+                evaluation_per_subcategory[subcategory] = {}
+            for scenario in route_scenarios:
+                route_scenarios_per_subcategory[scenario[filter]].append(scenario)
+            for subcategory in subcategories:
+                scores = np.array([scenario["score"] for scenario in route_scenarios_per_subcategory[subcategory]])
+                completions = np.array([scenario["completion"] for scenario in route_scenarios_per_subcategory[subcategory]])
+                durations = np.array([scenario["duration"] for scenario in route_scenarios_per_subcategory[subcategory]])
+                lengths = np.array([scenario["length"] for scenario in route_scenarios_per_subcategory[subcategory]])
 
-            infractions = np.array([[infraction[1] for infraction in scenario["infractions"]] 
-                        for scenario in route_scenarios_per_subcategory[subcategory]])
+                infractions = np.array([[infraction[1] for infraction in scenario["infractions"]] 
+                            for scenario in route_scenarios_per_subcategory[subcategory]])
 
-            scores_combined = (scores.mean(),scores.std())
-            completions_combined = (completions.mean(),completions.std())
-            durations_combined = (durations.mean(), durations.std())
-            lengths_combined = (lengths.mean(), lengths.std())
-            infractions_combined = [(mean,std) for mean,std in zip(infractions.mean(axis=0),infractions.std(axis=0))]
+                scores_combined = (scores.mean(),scores.std())
+                completions_combined = (completions.mean(),completions.std())
+                durations_combined = (durations.mean(), durations.std())
+                lengths_combined = (lengths.mean(), lengths.std())
+                infractions_combined = [(mean,std) for mean,std in zip(infractions.mean(axis=0),infractions.std(axis=0))]
 
-            evaluation_per_subcategory[subcategory] = {"score":scores_combined,
-                                                    "completion": completions_combined,
-                                                    "duration":durations_combined,
-                                                    "length":lengths_combined,
-                                                    "infractions": infractions_combined} 
-        evaluation_filtered[filter]=evaluation_per_subcategory
+                evaluation_per_subcategory[subcategory] = {"score":scores_combined,
+                                                        "completion": completions_combined,
+                                                        "duration":durations_combined,
+                                                        "length":lengths_combined,
+                                                        "infractions": infractions_combined} 
+            evaluation_filtered[filter]=evaluation_per_subcategory
 
-    # write output csv file
-    if not os.path.isdir(args.save_dir):
-        os.mkdir(args.save_dir)
-    f = open(os.path.join(args.save_dir, 'results.csv'),'w')      # Make file object first
-    csv_writer_object = csv.writer(f)   # Make csv writer object
-    # writerow writes one row of data given as list object
-    for info in total_score_info:
-        #print([info[key] for key in info.keys()])
-        csv_writer_object.writerow([item for _,item in info.items()])
-    csv_writer_object.writerow([""])
+        # write output csv file
+        if not os.path.isdir(args.save_dir):
+            os.mkdir(args.save_dir)
+        csv_file = open(os.path.join(args.save_dir, 'results_{}.csv'.format(f.split('.')[0])),'w')      # Make file object first
+        csv_writer_object = csv.writer(csv_file)   # Make csv writer object
+        # writerow writes one row of data given as list object
+        for info in total_score_info:
+            #print([info[key] for key in info.keys()])
+            csv_writer_object.writerow([item for _,item in info.items()])
+        csv_writer_object.writerow([""])
 
-    for filter in filters:
+        csv_file_daytime = open(os.path.join(args.save_dir, 'results_weather_daytime_{}.csv'.format(f.split('.')[0])),'w')      # Make file object first
+        csv_writer_object_daytime = csv.writer(csv_file_daytime)   # Make csv writer object 
         infractions_types = []
         for infraction in route_scenarios[0]["infractions"]:
             infractions_types.append(infraction[0]+" mean")
             infractions_types.append(infraction[0]+" std")
-
-        # route aggregation table has additional columns
-        if filter == "route":
-            csv_writer_object.writerow([filter,"town","weather","daytime","score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
-                                infractions_types)
-        else:
-            csv_writer_object.writerow([filter,"score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
-                                infractions_types)
-        
-        for key,item in evaluation_filtered[filter].items():
+        csv_writer_object_daytime.writerow(["weather_daytime","score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
+                                    infractions_types)
+        for key,item in evaluation_filtered["weather_daytime"].items():
             infractions_output = []
             for infraction in item["infractions"]:
                 infractions_output.append(infraction[0])
                 infractions_output.append(infraction[1])
+            csv_writer_object_daytime.writerow([key,
+                                                item["score"][0],item["score"][1],
+                                                item["completion"][0],item["completion"][1],
+                                                item["duration"][0],item["duration"][1],
+                                                item["length"][0],item["length"][1]]+
+                                                infractions_output)
+        for filter in filters:
+            infractions_types = []
+            for infraction in route_scenarios[0]["infractions"]:
+                infractions_types.append(infraction[0]+" mean")
+                infractions_types.append(infraction[0]+" std")
+
+            # route aggregation table has additional columns
             if filter == "route":
-                csv_writer_object.writerow([key,
-                                            route_matching[route_to_id[key]]["town"],
-                                            route_matching[route_to_id[key]]["weather"],
-                                            route_matching[route_to_id[key]]["daytime"],
-                                            item["score"][0],item["score"][1],
-                                            item["completion"][0],item["completion"][1],
-                                            item["duration"][0],item["duration"][1],
-                                            item["length"][0],item["length"][1]]+
-                                            infractions_output)
+                csv_writer_object.writerow([filter,"town","weather","daytime","score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
+                                    infractions_types)
             else:
-                csv_writer_object.writerow([key,
-                                            item["score"][0],item["score"][1],
-                                            item["completion"][0],item["completion"][1],
-                                            item["duration"][0],item["duration"][1],
-                                            item["length"][0],item["length"][1]]+
-                                            infractions_output)
+                csv_writer_object.writerow([filter,"score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
+                                    infractions_types)
+            
+            for key,item in evaluation_filtered[filter].items():
+                infractions_output = []
+                for infraction in item["infractions"]:
+                    infractions_output.append(infraction[0])
+                    infractions_output.append(infraction[1])
+                if filter == "route":
+                    csv_writer_object.writerow([key,
+                                                route_matching[route_to_id[key]]["town"],
+                                                route_matching[route_to_id[key]]["weather"],
+                                                route_matching[route_to_id[key]]["daytime"],
+                                                item["score"][0],item["score"][1],
+                                                item["completion"][0],item["completion"][1],
+                                                item["duration"][0],item["duration"][1],
+                                                item["length"][0],item["length"][1]]+
+                                                infractions_output)
+                else:
+                    csv_writer_object.writerow([key,
+                                                item["score"][0],item["score"][1],
+                                                item["completion"][0],item["completion"][1],
+                                                item["duration"][0],item["duration"][1],
+                                                item["length"][0],item["length"][1]]+
+                                                infractions_output)
+            csv_writer_object.writerow([""])
+            
+        csv_writer_object.writerow(["town","weather","daylight","infraction type","x","y","z"])
+        # writerow writes one row of data given as list object
+        for scenario in route_scenarios:
+            #print([scenario[key] for key in scenario.keys() if key!="town"])
+            for infraction in scenario["infractions"]:
+                for coord in infraction[2]:
+                    if type(coord[0]) != str:
+                        csv_writer_object.writerow([scenario["town"],scenario["weather"],scenario["daytime"],
+                                                    infraction[0]]+coord)
         csv_writer_object.writerow([""])
-        
-    csv_writer_object.writerow(["town","weather","daylight","infraction type","x","y","z"])
-    # writerow writes one row of data given as list object
-    for scenario in route_scenarios:
-        #print([scenario[key] for key in scenario.keys() if key!="town"])
-        for infraction in scenario["infractions"]:
-            for coord in infraction[2]:
-                if type(coord[0]) != str:
-                    csv_writer_object.writerow([scenario["town"],scenario["weather"],scenario["daytime"],
-                                                infraction[0]]+coord)
-    csv_writer_object.writerow([""])
-    f.close()
+        csv_file.close()
 
-    # load town maps for plotting infractions
-    town_maps = {}
-    for town_name in towns:
-        town_maps[town_name] = np.array(Image.open(os.path.join(args.town_maps, town_name+'.png')))[:,:,:3]
+        # load town maps for plotting infractions
+        town_maps = {}
+        for town_name in towns:
+            town_maps[town_name] = np.array(Image.open(os.path.join(args.town_maps, town_name+'.png')))[:,:,:3]
 
-    create_legend()
+        create_legend()
 
-    for scenario in route_scenarios:
-        for infraction in scenario["infractions"]:
-            for coord in infraction[2]:
-                if type(coord[0]) != str:
-                    
-                    x = coord[0]
-                    y = coord[1]
-                    
-                    town_name = scenario["town"]
-                    
-                    hex_str,_ = infraction_to_symbol[infraction[0]]
-                    color = hex_to_list(hex_str)
-                    # plot infractions
-                    town_maps[town_name] = plotPixel((x,y), town_name, town_maps[town_name], color)
+        for scenario in route_scenarios:
+            for infraction in scenario["infractions"]:
+                for coord in infraction[2]:
+                    if type(coord[0]) != str:
+                        
+                        x = coord[0]
+                        y = coord[1]
+                        
+                        town_name = scenario["town"]
+                        
+                        hex_str,_ = infraction_to_symbol[infraction[0]]
+                        color = hex_to_list(hex_str)
+                        # plot infractions
+                        town_maps[town_name] = plotPixel((x,y), town_name, town_maps[town_name], color)
 
-    for town_name in towns:
-        tmap = Image.fromarray(town_maps[town_name])
-        tmap.save(os.path.join(args.save_dir, town_name+'.png'))
+        for town_name in towns:
+            tmap = Image.fromarray(town_maps[town_name])
+            tmap.save(os.path.join(args.save_dir, town_name+'_{}'.format(f.split('.')[0])+'.png'))
 
 
 if __name__ == '__main__':
