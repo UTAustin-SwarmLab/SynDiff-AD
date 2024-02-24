@@ -1,4 +1,4 @@
-_base_ = ['mask2former_r50_8xb2-90k_mixedwaymoftrct-512x512.py']
+_base_ = ['mask2former_r50_8xb2-90k_mixedbddftceqrct-512x512.py']
 crop_size = (512, 512)
 data_preprocessor = dict(
     type='SegDataPreProcessor',
@@ -16,24 +16,18 @@ depths = [2, 2, 6, 2]
 num_classes = 29
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
-    dict(type='PackSegInputs', meta_keys=['context_name',
-                                          'context_frame',
-                                          'camera_id',
+    dict(type='PackSegInputs', meta_keys=['file_name',
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
-                                          'condition',
                                           'reduce_zero_label'])
 ]
 test_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False, test=True),
-    dict(type='PackSegInputs', meta_keys=['context_name',
-                                          'context_frame',
-                                          'camera_id',
+    dict(type='PackSegInputs', meta_keys=['file_name',
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
-                                          'condition',
                                           'reduce_zero_label'])
 ]
 
@@ -93,7 +87,6 @@ val_evaluator = dict(
     iou_metrics=[
         'mIoU',
     ], type='IoUMetric')
-
 train_dataloader = dict(
     batch_size=4,
     num_workers=4,
@@ -103,7 +96,7 @@ train_dataloader = dict(
   )
 
 val_dataloader = dict(
-    batch_size=8,
+    batch_size=4,
     num_workers=4,
     dataset=dict(
     pipeline=test_pipeline,
