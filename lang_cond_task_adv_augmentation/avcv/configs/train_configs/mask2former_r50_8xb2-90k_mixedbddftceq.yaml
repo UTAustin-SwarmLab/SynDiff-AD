@@ -1,0 +1,9 @@
+model_name: 'mask2former_r50_8xb2-90k_mixedbddftceq-512x512'
+model_config_path: 'avcv/configs/models/'
+load_model_paths: 'avcv/model_weights/mask2former_r50_8xb2-160k_ade20k-512x512_20221204_000055-2d1f55f1.pth'
+work_dir: '/store/harsh/work_dirs/'
+source_model: 'mask2former_r50_8xb2-90k_bdd-512x512'
+max_iters: 40000
+val_interval: 40000
+logger_interval: 5
+checkpoint_interval: 10000
