@@ -240,11 +240,10 @@ def main():
 			print('PreLoading checkpoint from ' + args.preload_dir)
 
 			# load checkpoint
-			device = torch.device(args.device)
-			model.encoder.load_state_dict(torch.load(os.path.join(args.preload_dir, 'encoder.pth')),
-                                 map_location=device)
-			model.decoder.load_state_dict(torch.load(os.path.join(args.preload_dir, 'decoder.pth')),
-                                 map_location=device)
+			model.encoder.load_state_dict(torch.load(os.path.join(args.logdir, 'encoder.pth'),
+                                       map_location=torch.device(args.device)))
+			model.decoder.load_state_dict(torch.load(os.path.join(args.logdir, 'encoder.pth'),
+                                       map_location=torch.device(args.device)))
 
 			optimizer.load_state_dict(torch.load(os.path.join(args.preload_dir, 'recent_optim.pth')))
 	if os.path.isdir(args.logdir):
@@ -261,10 +260,10 @@ def main():
 			trainer.val_loss = log_table['val_loss']
 
 			# load checkpoint
-			model.encoder.load_state_dict(torch.load(os.path.join(args.logdir, 'encoder.pth')),
-                                 map_location=torch.device(args.device))
-			model.decoder.load_state_dict(torch.load(os.path.join(args.logdir, 'decoder.pth')),
-                                 map_location=torch.device(args.device))
+			model.encoder.load_state_dict(torch.load(os.path.join(args.logdir, 'encoder.pth'),
+                                       map_location=torch.device(args.device)))
+			model.decoder.load_state_dict(torch.load(os.path.join(args.logdir, 'encoder.pth'),
+                                       map_location=torch.device(args.device)))
 
 			optimizer.load_state_dict(torch.load(os.path.join(args.logdir, 'recent_optim.pth')))
 	
