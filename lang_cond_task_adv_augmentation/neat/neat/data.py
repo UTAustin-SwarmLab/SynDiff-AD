@@ -348,7 +348,7 @@ class CARLA_points(Dataset):
             if num_samples > 0:
                 indices = np.random.choice(counts[class_index], num_samples, replace=False)
                 train_semantic_points.append(semantic_points[class_index][indices])
-                train_semantic_labels.append(np.ones(num_samples).astype(np.int)*class_index)
+                train_semantic_labels.append(np.ones(num_samples).astype(np.int32)*class_index)
 
         train_semantic_points = np.concatenate(train_semantic_points)
         train_semantic_labels = np.concatenate(train_semantic_labels)
