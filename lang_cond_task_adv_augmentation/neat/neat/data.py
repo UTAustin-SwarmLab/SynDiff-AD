@@ -259,11 +259,17 @@ class CARLA_points(Dataset):
         full_semantics = []
         for i in range(self.seq_len):
             data['fronts'].append(torch.from_numpy(np.array(
-                scale_and_crop_image(seq_fronts[i], scale=self.scale, crop=self.crop))))
+                scale_and_crop_image(seq_fronts[i], 
+                                     scale=self.scale, 
+                                     crop=self.crop)).astype(np.float32)/255.0))
             data['lefts'].append(torch.from_numpy(np.array(
-                scale_and_crop_image(seq_lefts[i], scale=self.scale, crop=self.crop))))
+                scale_and_crop_image(seq_lefts[i], 
+                                     scale=self.scale, 
+                                     crop=self.crop)).astype(np.float32)/255.0))
             data['rights'].append(torch.from_numpy(np.array(
-                scale_and_crop_image(seq_rights[i], scale=self.scale, crop=self.crop))))
+                scale_and_crop_image(seq_rights[i], 
+                                     scale=self.scale,
+                                     crop=self.crop)).astype(np.float32)/255.0))
 
             semantics_unprocessed = (torch.from_numpy(np.array(
                 scale_and_crop_image(seq_topdowns[i],
@@ -422,7 +428,7 @@ def scale_and_crop_image(filename, scale, crop):
     else:
         im_resized = image
 
-    image = np.asarray(im_resized).astype(np.float32)/255.0
+    image = np.asarray(im_resized)
     start_y = height//2 - crop//2
     start_x = width//2 - crop//2
 
