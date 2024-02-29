@@ -281,7 +281,7 @@ class CARLA_points(Dataset):
             semantic_points[k] = (np.concatenate(semantic_points[k], axis=0))
             semantic_points[k][:,0] = semantic_points[k][:,0] / self.resolution
             semantic_points[k][:,1] = semantic_points[k][:,1] / self.resolution
-            semantic_points[k] = semantic_points[k].astype(np.int)
+            semantic_points[k] = semantic_points[k].astype(np.int32)
             counts.append(semantic_points[k].shape[0])
 
         train_semantic_points = []
@@ -383,7 +383,7 @@ def scale_and_crop_image(filename, scale, crop):
     else:
         im_resized = image
 
-    image = np.asarray(im_resized)
+    image = np.asarray(im_resized).astype(np.float32)/255.0
     start_y = height//2 - crop//2
     start_x = width//2 - crop//2
 
@@ -421,4 +421,14 @@ def transform_2d_points(xyz, r1, t1_x, t1_y, r2, t2_x, t2_y):
 
     return out
 
+if __name__=="__main__":
+    import neat
+    import neat.neat
+    from neat.neat.config import GlobalConfig as config
+    import neat.neat.data
+    import neat.neat.utils
     
+    dataset = CARLA_points(root = config.train_data, config = config)
+    dataset[1000] 
+    dataset[21000]
+    dataset[41000]
