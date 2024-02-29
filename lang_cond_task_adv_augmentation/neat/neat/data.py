@@ -214,7 +214,6 @@ class CARLA_points(Dataset):
                 
                 if num_synth_routes > 0 and num_synth_routes > num_real_routes:
                     ratio = int(num_synth_routes / num_real_routes)
-                    ratio = 1
                 else:
                     ratio = 1
                 for _ in range(ratio):
