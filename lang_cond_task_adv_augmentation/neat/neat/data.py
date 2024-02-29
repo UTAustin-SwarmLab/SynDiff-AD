@@ -326,7 +326,7 @@ class CARLA_points(Dataset):
             semantic_points[k] = (np.concatenate(semantic_points[k], axis=0))
             semantic_points[k][:,0] = semantic_points[k][:,0] / self.resolution
             semantic_points[k][:,1] = semantic_points[k][:,1] / self.resolution
-            semantic_points[k] = semantic_points[k].astype(np.int32)
+            semantic_points[k] = semantic_points[k].astype(np.int64)
             counts.append(semantic_points[k].shape[0])
 
         train_semantic_points = []
@@ -348,7 +348,7 @@ class CARLA_points(Dataset):
             if num_samples > 0:
                 indices = np.random.choice(counts[class_index], num_samples, replace=False)
                 train_semantic_points.append(semantic_points[class_index][indices])
-                train_semantic_labels.append(np.ones(num_samples).astype(np.int32)*class_index)
+                train_semantic_labels.append(np.ones(num_samples).astype(np.int64)*class_index)
 
         train_semantic_points = np.concatenate(train_semantic_points)
         train_semantic_labels = np.concatenate(train_semantic_labels)
