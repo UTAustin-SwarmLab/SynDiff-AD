@@ -240,9 +240,9 @@ def main():
 			print('PreLoading checkpoint from ' + args.preload_dir)
 
 			# load checkpoint
-			model.encoder.load_state_dict(torch.load(os.path.join(args.logdir, 'encoder.pth'),
+			model.encoder.load_state_dict(torch.load(os.path.join(args.preload_from_id , 'encoder.pth'),
                                        map_location=torch.device(args.device)))
-			model.decoder.load_state_dict(torch.load(os.path.join(args.logdir, 'decoder.pth'),
+			model.decoder.load_state_dict(torch.load(os.path.join(args.preload_from_id , 'decoder.pth'),
                                        map_location=torch.device(args.device)))
 
 			optimizer.load_state_dict(torch.load(os.path.join(args.preload_dir, 'recent_optim.pth')))
