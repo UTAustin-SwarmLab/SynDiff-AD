@@ -4,10 +4,10 @@ import cv2
 import os
 from tqdm import tqdm
 
-experiment = 'carla'
+experiment = 'seg'
 
 if experiment == 'seg':
-    DIR_PATH = '/store/harsh/data/bdd_synthetic_ft_rct/img/'
+    DIR_PATH = '/store/harsh/data/bdd_synthetic_ft_ceq/img/'
     print('Converting images to PIL Image FROM:', DIR_PATH)
     for _,file in tqdm(enumerate(os.listdir(DIR_PATH)), total=len(os.listdir(DIR_PATH))):
         if file.endswith('.png'):

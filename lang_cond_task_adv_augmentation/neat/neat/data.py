@@ -44,7 +44,20 @@ class CARLA_points(Dataset):
         self.command = []
         self.velocity = []
 
-
+        num_synth_routes = 0
+        num_real_routes = 0
+        for sub_root in root:
+            # check number of routes in for type synthetic and ensure real routes match 
+            if 'synth' in sub_root:
+                num_routes = len([folder for folder in os.listdir(sub_root) 
+                                  if os.path.isdir(os.path.join(sub_root, folder))])
+                num_synth_routes += num_routes
+            else:
+                num_routes = len([folder for folder in os.listdir(sub_root) 
+                                  if os.path.isdir(os.path.join(sub_root, folder))])
+                num_real_routes += num_routes
+        
+        
         for sub_root in root:
             preload_file = os.path.join(sub_root, 'pl_'+str(config.seq_len)+'_'+str(config.pred_len)+'.npy')
 
@@ -181,21 +194,47 @@ class CARLA_points(Dataset):
 
             # load from stored npy
             preload_dict = np.load(preload_file, allow_pickle=True)
-            self.front += preload_dict.item()['front']
-            self.left += preload_dict.item()['left']
-            self.right += preload_dict.item()['right']
-            self.topdown += preload_dict.item()['topdown']
-            self.x += preload_dict.item()['x']
-            self.y += preload_dict.item()['y']
-            self.x_command += preload_dict.item()['x_command']
-            self.y_command += preload_dict.item()['y_command']
-            self.theta += preload_dict.item()['theta']
-            self.steer += preload_dict.item()['steer']
-            self.throttle += preload_dict.item()['throttle']
-            self.brake += preload_dict.item()['brake']
-            self.command += preload_dict.item()['command']
-            self.velocity += preload_dict.item()['velocity']
-            print("Preloading " + str(len(preload_dict.item()['front'])) + " sequences from " + preload_file)
+            if 'synth' in sub_root:
+                self.front += preload_dict.item()['front']
+                self.left += preload_dict.item()['left']
+                self.right += preload_dict.item()['right']
+                self.topdown += preload_dict.item()['topdown']
+                self.x += preload_dict.item()['x']
+                self.y += preload_dict.item()['y']
+                self.x_command += preload_dict.item()['x_command']
+                self.y_command += preload_dict.item()['y_command']
+                self.theta += preload_dict.item()['theta']
+                self.steer += preload_dict.item()['steer']
+                self.throttle += preload_dict.item()['throttle']
+                self.brake += preload_dict.item()['brake']
+                self.command += preload_dict.item()['command']
+                self.velocity += preload_dict.item()['velocity']
+                print("Preloading " + str(len(preload_dict.item()['front'])) + " sequences from " + preload_file)
+            else:
+                
+                if num_synth_routes > 0 and num_synth_routes > num_real_routes:
+                    ratio = int(num_synth_routes / num_real_routes)
+                else:
+                    ratio = 1
+                for _ in range(ratio):
+                    self.front += preload_dict.item()['front']
+                    self.left += preload_dict.item()['left']
+                    self.right += preload_dict.item()['right']
+                    self.topdown += preload_dict.item()['topdown']
+                    self.x += preload_dict.item()['x']
+                    self.y += preload_dict.item()['y']
+                    self.x_command += preload_dict.item()['x_command']
+                    self.y_command += preload_dict.item()['y_command']
+                    self.theta += preload_dict.item()['theta']
+                    self.steer += preload_dict.item()['steer']
+                    self.throttle += preload_dict.item()['throttle']
+                    self.brake += preload_dict.item()['brake']
+                    self.command += preload_dict.item()['command']
+                    self.velocity += preload_dict.item()['velocity']
+                num_real_routes -= 1
+                num_synth_routes -= ratio
+                print("Preloading " + str(len(preload_dict.item()['front'])) + \
+                      " sequences from " + preload_file + " " + str(ratio) + " times")
 
     def __len__(self):
         """Returns the length of the dataset. """
@@ -220,11 +259,17 @@ class CARLA_points(Dataset):
         full_semantics = []
         for i in range(self.seq_len):
             data['fronts'].append(torch.from_numpy(np.array(
-                scale_and_crop_image(seq_fronts[i], scale=self.scale, crop=self.crop))))
+                scale_and_crop_image(seq_fronts[i], 
+                                     scale=self.scale, 
+                                     crop=self.crop)).astype(np.float32)/255.0))
             data['lefts'].append(torch.from_numpy(np.array(
-                scale_and_crop_image(seq_lefts[i], scale=self.scale, crop=self.crop))))
+                scale_and_crop_image(seq_lefts[i], 
+                                     scale=self.scale, 
+                                     crop=self.crop)).astype(np.float32)/255.0))
             data['rights'].append(torch.from_numpy(np.array(
-                scale_and_crop_image(seq_rights[i], scale=self.scale, crop=self.crop))))
+                scale_and_crop_image(seq_rights[i], 
+                                     scale=self.scale,
+                                     crop=self.crop)).astype(np.float32)/255.0))
 
             semantics_unprocessed = (torch.from_numpy(np.array(
                 scale_and_crop_image(seq_topdowns[i],
@@ -281,7 +326,7 @@ class CARLA_points(Dataset):
             semantic_points[k] = (np.concatenate(semantic_points[k], axis=0))
             semantic_points[k][:,0] = semantic_points[k][:,0] / self.resolution
             semantic_points[k][:,1] = semantic_points[k][:,1] / self.resolution
-            semantic_points[k] = semantic_points[k].astype(np.int)
+            semantic_points[k] = semantic_points[k].astype(np.int64)
             counts.append(semantic_points[k].shape[0])
 
         train_semantic_points = []
@@ -303,7 +348,7 @@ class CARLA_points(Dataset):
             if num_samples > 0:
                 indices = np.random.choice(counts[class_index], num_samples, replace=False)
                 train_semantic_points.append(semantic_points[class_index][indices])
-                train_semantic_labels.append(np.ones(num_samples).astype(np.int)*class_index)
+                train_semantic_labels.append(np.ones(num_samples).astype(np.int64)*class_index)
 
         train_semantic_points = np.concatenate(train_semantic_points)
         train_semantic_labels = np.concatenate(train_semantic_labels)
@@ -421,4 +466,13 @@ def transform_2d_points(xyz, r1, t1_x, t1_y, r2, t2_x, t2_y):
 
     return out
 
+if __name__=="__main__":
+    import neat
+    from neat.config import GlobalConfig as config
+    import neat.data
+    import neat.utils
     
+    dataset = CARLA_points(root = config.train_data, config = config)
+    dataset[1000] 
+    dataset[21000]
+    dataset[41000]
