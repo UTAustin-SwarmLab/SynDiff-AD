@@ -283,7 +283,7 @@ class SyntheticAVGenerator:
                     (img_data['file_name'] == self.prompt_df['file_name'])
                 ]['caption'].values[0]
                 source_condition = self.metadata_conditions.loc[
-                    (img_data['file_name'] == self.metadata_conditions['context_name'])
+                    (img_data['file_name'] == self.metadata_conditions['file_name'])
                 ]['condition'].values[0]
             elif self.dataset_type == 'carla':
                 source_condition = img_data['condition']
