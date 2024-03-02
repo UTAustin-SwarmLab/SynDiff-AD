@@ -409,6 +409,8 @@ class EvaluateSynthesisFID:
                     condition = self.fake_metadata_conditions.loc[
                         (self.fake_metadata_conditions['filename'] == meta_data['file_name']) 
                     ]['condition'].values[0]
+                    condition = condition.strip("[]")
+                    condition = condition.strip("''")
                 # Update the FID metric with the features
                     self.fid_dict[condition].update(fake_features[[i]], real=False)
                 self.final_fid.update(fake_features, real=False)
