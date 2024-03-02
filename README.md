@@ -8,7 +8,7 @@ This is a template repository. Please initialize your python project using this 
    ```
    conda env create -n control-v11.8 -f environment.yml
    ```
-   Use the conda env to develop further
+   Use the conda env to develop further. Ensure torch version is 2.1.0
 
 6.  To install and setup mmsegmentation
    ```
