@@ -250,9 +250,7 @@ class EvaluateSynthesisFID:
                     PALLETE = self.config.IMAGE.BDD.PALLETE),
                 pipeline=[
                     dict(type='AVResize', scale=[512,512], keep_ratio=False),
-                    dict(type='PackSegInputs', meta_keys=['context_name',
-                                                        'context_frame',
-                                                        'camera_id',
+                    dict(type='PackSegInputs', meta_keys=['file_name',
                                                         'ori_shape',
                                                         'img_shape',
                                                         'scale_factor',
@@ -267,7 +265,7 @@ class EvaluateSynthesisFID:
         self.real_data_loader = torch.utils.data.DataLoader(
             self.real_data,
             batch_size=16,
-            num_workers=16,
+            num_workers=4,
             persistent_workers=True,
             shuffle=False,
             collate_fn=collate_fn
@@ -300,9 +298,7 @@ class EvaluateSynthesisFID:
                     PALLETE = self.config.IMAGE.BDD.PALLETE),
                 pipeline=[
                     dict(type='AVResize', scale=[512,512], keep_ratio=False),
-                    dict(type='PackSegInputs', meta_keys=['context_name',
-                                                        'context_frame',
-                                                        'camera_id',
+                    dict(type='PackSegInputs', meta_keys=['file_name',
                                                         'ori_shape',
                                                         'img_shape',
                                                         'scale_factor',
@@ -317,7 +313,7 @@ class EvaluateSynthesisFID:
         self.fake_data_loader = torch.utils.data.DataLoader(
             self.fake_data,
             batch_size=16,
-            num_workers=16,
+            num_workers=4,
             persistent_workers=True,
             shuffle=False,
             collate_fn=collate_fn
@@ -379,10 +375,17 @@ class EvaluateSynthesisFID:
                 real_features = real_features.cpu()
                 for i in range(0, len(data_samples)):
                     meta_data = data_samples[i].metainfo
-                    condition = self.real_metadata_conditions.loc[
-                        (self.real_metadata_conditions['context_name'] == meta_data['context_name']) & 
-                        (self.real_metadata_conditions['context_frame'] == meta_data['context_frame']) & 
-                        (self.real_metadata_conditions['camera_id'] == meta_data['camera_id']) 
+                    if self.config.experiment == 'waymo':
+                        condition = self.real_metadata_conditions.loc[
+                            (self.real_metadata_conditions['context_name'] == meta_data['context_name']) & 
+                            (self.real_metadata_conditions['context_frame'] == meta_data['context_frame']) & 
+                            (self.real_metadata_conditions['camera_id'] == meta_data['camera_id']) 
+                        ]['condition'].values[0]
+                    elif self.config.experiment == 'bdd':
+                        print(self.real_metadata_conditions.columns)
+                        print(meta_data.keys())
+                        condition = self.real_metadata_conditions.loc[
+                            (self.real_metadata_conditions['file_name'] == meta_data['file_name']) 
                     ]['condition'].values[0]
                     # Update the FID metric with the features
                     self.fid_dict[condition].update(real_features[[i]], real=True)
