@@ -19,7 +19,7 @@ IMAGE:
     #which camera frames to save
     SAVE_FRAMES: [0,1,2] #@param {type: "LIST"}
     SAVE_DATA: True
-    PALLETE: 'coco' # Choices: coco, ade20k, waymo, cocofull
+    PALLETE: 'cocofull' # Choices: coco, ade20k, waymo, cocofull
   BDD100k:
 control_net:
   CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'

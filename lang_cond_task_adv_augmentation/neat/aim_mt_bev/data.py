@@ -324,4 +324,13 @@ def transform_2d_points(xyz, r1, t1_x, t1_y, r2, t2_x, t2_y):
 
     return out
 
+if __name__=="__main__":
+    import aim_mt_bev
+    from aim_mt_bev.config import GlobalConfig as config
+    import aim_mt_bev.data
+
     
+    dataset = CARLA_points(root = config.train_data, config = config)
+    dataset[1000] 
+    dataset[21000]
+    dataset[41000]

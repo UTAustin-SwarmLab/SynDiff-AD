@@ -86,6 +86,7 @@ class Engine(object):
 			target_point = torch.stack(data['target_point'], dim=1).to(args.device, dtype=torch.float32)
 
 			# inference
+			model.zero_grad()
 			encoding = [model.image_encoder(fronts)]
 			if not config.ignore_sides:
 				encoding.append(model.image_encoder(lefts))

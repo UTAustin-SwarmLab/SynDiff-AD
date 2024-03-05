@@ -43,6 +43,7 @@ from lang_data_synthesis.utils import convert_pallette_segment
 from copy import copy
 from bdd100k.data_loader import BDD100KDataset
 from argparse import ArgumentParser
+from carla.data_loader import CARLADataset
 import pandas as pd
 def gradio_viz(
         title:str,
@@ -225,7 +226,7 @@ def get_bdd(config):
     IMAGE_META_DATA = True
     VALIDATION = True
     
-    dataset = BDD100KDataset(config.IMAGE.BDD, 
+    dataset = CarlaDataset(config.IMAGE.BDD, 
                 image_meta_data=IMAGE_META_DATA,
                 segmentation=SEGMENTATION,
                         validation=VALIDATION)
@@ -243,8 +244,8 @@ def get_bdd(config):
     
     # Obtain the segmentation mask
     prompt_tokens = {}
-    prompt_tokens['a_prompt'] = "Must contain " + BDD100KDataset.get_text_description(object_masks, dataset.CLASSES)
-    prompt_tokens['n_prompt'] = "Must not contain " +  BDD100KDataset.get_text_description(object_masks, dataset.CLASSES)
+    prompt_tokens['a_prompt'] = "Must contain " + CarlaDataset.get_text_description(object_masks, dataset.CLASSES)
+    prompt_tokens['n_prompt'] = "Must not contain " +  BDataset.get_text_description(object_masks, dataset.CLASSES)
     
     semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
     invalid_mask = dataset.get_unmapped_mask(object_masks)
@@ -257,6 +258,47 @@ def get_bdd(config):
         source_condition = metadata_conditions.loc[
                     (img_data['file_name'] == metadata_conditions['context_name'])
                 ]['condition'].values[0]
+    return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask, prompt, source_condition
+
+def get_carla(config):
+    SEGMENTATION = True
+    IMAGE_META_DATA = True
+    VALIDATION = True
+    
+    dataset = CARLADataset(config, 
+                image_meta_data=IMAGE_META_DATA,
+                segmentation=SEGMENTATION,
+                        validation=VALIDATION)
+
+    prompt_df = None
+    if config.SYN_DATASET_GEN.use_llava_prompt:
+        llavafilename = os.path.join(config.SYN_DATASET_GEN.llava_prompt_path)
+        prompt_df = pd.read_csv(llavafilename)
+
+        
+    # Obtain the image
+    #np.random.seed(200)
+    idx = np.random.randint(0, len(dataset))
+    camera_images, semantic_mask_rgb, instance_masks, object_masks, img_data = dataset[idx]
+    
+    # Obtain the segmentation mask
+    prompt_tokens = {}
+    prompt_tokens['a_prompt'] = "Must contain " + CARLADataset.get_text_description(object_masks, dataset.CLASSES)
+    prompt_tokens['n_prompt'] = "Must not contain " +  CARLADataset.get_text_description(object_masks, dataset.CLASSES)
+    
+    semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
+    invalid_mask = dataset.get_unmapped_mask(object_masks)
+    prompt = None
+    source_condition = None
+    if prompt_df is not None:
+        prompt = prompt_df.loc[
+                    (img_data['route'] == prompt_df['route'])&
+                    (img_data['file_name']==prompt_df['file_name'])&
+                    (img_data['mask_path'] == prompt_df['mask_path'])&
+                    (img_data['synthetic'] == prompt_df['synthetic'])&
+                    (img_data['condition'] == prompt_df['condition'])
+                ]['caption'].values[0]
+        source_condition = img_data['condition']
     return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask, prompt, source_condition
 
 class ImageSynthesis:
@@ -478,7 +520,7 @@ def parse_args():
         
     parser.add_argument(
         '--experiment',
-        choices=['waymo', 'bdd', 'plan', 'cliport'],
+        choices=['waymo', 'bdd', 'carla', 'cliport'],
         default='none',
         help='Which experiment config to generate data for')
     
@@ -506,6 +548,8 @@ if __name__ == "__main__":
             img, seg_mask, object_keys, mask, prompt, weather = get_waymo(config)
         elif args.experiment == 'bdd':
             img, seg_mask, object_keys, mask, prompt, weather = get_bdd(config)
+        elif args.experiment == 'carla':
+            img, seg_mask, object_keys, mask, prompt, weather = get_carla(config)
             
         if isinstance(object_keys, list):
             prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
@@ -526,8 +570,12 @@ if __name__ == "__main__":
             if prompt is None:
                 prompt = 'Rainy weather condition during nightime'
             else:
-                prompt = prompt.replace(source_weather, weather)
-                prompt = prompt.replace(source_day, day)
+                if args.experiment == 'carla':
+                    prompt = prompt.replace(weather, 'RainyNight')
+                else:
+                    prompt = prompt.replace(weather, 'RainyNight')
+                    prompt = prompt.replace(source_day, day)
+                    
             outputs = synthesizer.run_model(img.copy(), 
                                 seg_mask=[seg_mask.copy()],
                                 prompt = prompt,

@@ -28,14 +28,14 @@ class GlobalConfig:
     axis = 256 # width/height of scene representation (from LBC)
     offset = 128 # offset along y dimension to the origin (from LBC)
 
-    num_class = 5
+    num_class = 6
     classes = {
         0: [0, 0, 0],        # unlabeled
         1: [0, 0, 255],    # obstacle
         2: [128, 64, 128],   # road
         3: [255, 0, 0],     # red light
         4: [0, 255, 0],     # green light
-        # 5: [157, 234,  50],    # road line
+        5: [157, 234,  50],    # road line
     }
 
     converter = [
@@ -45,7 +45,7 @@ class GlobalConfig:
     0,    # other
     1,    # ped
     0,    # pole
-    2,    # road line
+    5,    # road line
     2,    # road
     0,    # sidewalk
     0,    # vegetation
@@ -66,7 +66,7 @@ class GlobalConfig:
     3,    # yellow light
     4,    # green light
     0,    # stop sign
-    2,    # Another road line marker
+    5,    # Another road line marker
     ]
 
     points_per_class = 64 # number of scene points sampled per class for perception training

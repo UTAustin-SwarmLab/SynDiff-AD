@@ -7,13 +7,13 @@ class GlobalConfig:
     pred_len = 4 # future waypoints predicted
     tot_len = seq_len + pred_len
 
-    root_dir = '/is/rg/avg/kchitta/carla9-10_data/2021/apv3'
-    train_towns = ['Town01', 'Town02', 'Town03', 'Town04', 'Town05', 'Town06', 'Town07', 'Town10']
-    val_towns = ['Town01_long', 'Town02_long', 'Town03_long', 'Town04_long', 'Town05_long', 'Town06_long']
+    root_dir = '/store/harsh/carla_data_neat/'
+    train_towns = ["expert", "synthexpert"]
+    val_towns = ["expert"]
     train_data, val_data = [], []
     for town in train_towns:
         train_data.append(os.path.join(root_dir, town))
-        train_data.append(os.path.join(root_dir, town+'_small'))
+        # train_data.append(os.path.join(root_dir, town+'_small'))
     for town in val_towns:
         val_data.append(os.path.join(root_dir, town))
 
@@ -34,14 +34,14 @@ class GlobalConfig:
     axis = 256 # width/height of scene representation (from LBC)
     offset = 128 # offset along y dimension to the origin (from LBC)
 
-    num_class = 5
+    num_class = 6
     classes = {
         0: [0, 0, 0],        # unlabeled
         1: [0, 0, 255],    # obstacle
         2: [128, 64, 128],   # road
         3: [255, 0, 0],     # red light
         4: [0, 255, 0],     # green light
-        # 5: [157, 234,  50],    # road line
+        5: [157, 234,  50],    # road line
     }
     converter = [
     0,    # unlabeled
@@ -50,7 +50,7 @@ class GlobalConfig:
     0,    # other
     1,    # ped
     0,    # pole
-    2,    # road line
+    5,    # road line
     2,    # road
     0,    # sidewalk
     0,    # vegetation
@@ -71,6 +71,7 @@ class GlobalConfig:
     3,    # yellow light
     4,    # green light
     0,    # stop sign
+    5,    # road line
     ]
 
     # Loss
