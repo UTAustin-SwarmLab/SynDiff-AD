@@ -7,13 +7,13 @@ class GlobalConfig:
     pred_len = 4 # future waypoints predicted
     tot_len = seq_len + pred_len
 
-    root_dir = '/is/rg/avg/kchitta/carla9-10_data/2021/apv3'
-    train_towns = ['Town01', 'Town02', 'Town03', 'Town04', 'Town05', 'Town06', 'Town07', 'Town10']
-    val_towns = ['Town01_long', 'Town02_long', 'Town03_long', 'Town04_long', 'Town05_long', 'Town06_long']
+    root_dir = '/store/harsh/carla_data_neat/'
+    train_towns = ["expert"]
+    val_towns = ["experteval"]
     train_data, val_data = [], []
     for town in train_towns:
         train_data.append(os.path.join(root_dir, town))
-        train_data.append(os.path.join(root_dir, town+'_small'))
+        #train_data.append(os.path.join(root_dir, town+'_small'))
     for town in val_towns:
         val_data.append(os.path.join(root_dir, town))
 
@@ -21,7 +21,7 @@ class GlobalConfig:
 
     ignore_sides = True # don't consider side cameras
     ignore_rear = True # don't consider rear cameras
-    n_views = 1 # no. of camera views
+    n_views = 3 # no. of camera views
 
     input_resolution = 256
 
@@ -33,20 +33,21 @@ class GlobalConfig:
         1: [0, 0, 255],    # vehicle
         2: [128, 64, 128],   # road
         3: [255, 0, 0],     # red light
-        4: [0, 255, 0],     # pedestrian
-        5: [157, 234,  50],    # road line
-        6: [255, 255, 255], # sidewalk
+        4: [0, 255, 0],     # green light
+        5: [0, 255, 255],     # pedestrian
+        6: [157, 234,  50],    # road line
+        # 6: [255, 255, 255], # sidewalk
     }
     converter = [
     0,    # unlabeled
     0,    # building
     0,    # fence
     0,    # other
-    4,    # pedestrian
+    5,    # pedestrian
     0,    # pole
-    5,    # road line
+    6,    # road line
     2,    # road
-    6,    # sidewalk
+    0,    # sidewalk
     0,    # vegetation
     1,    # vehicle
     0,    # wall
@@ -62,10 +63,10 @@ class GlobalConfig:
     0,    # water
     0,    # terrain
     3,    # red light
-    0,    # yellow light
-    0,    # green light
+    3,    # yellow light
+    4,    # green light
     0,    # stop sign
-    5,    # stop line marking
+    6,    # stop line marking
     ]
 
     lr = 1e-4
