@@ -41,6 +41,19 @@ class CARLA_points(Dataset):
         self.brake = []
         self.command = []
         self.velocity = []
+        
+        num_synth_routes = 0
+        num_real_routes = 0
+        for sub_root in root:
+            # check number of routes in for type synthetic and ensure real routes match 
+            if 'synth' in sub_root:
+                num_routes = len([folder for folder in os.listdir(sub_root) 
+                                  if os.path.isdir(os.path.join(sub_root, folder))])
+                num_synth_routes += num_routes
+            else:
+                num_routes = len([folder for folder in os.listdir(sub_root) 
+                                  if os.path.isdir(os.path.join(sub_root, folder))])
+                num_real_routes += num_routes
 
         for sub_root in root:
             preload_file = os.path.join(sub_root, 'pl_'+str(config.seq_len)+'_'+str(config.pred_len)+'.npy')
@@ -107,8 +120,8 @@ class CARLA_points(Dataset):
                                     data = json.load(read_file)
                             
                             # position
-                            with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
-                                data = json.load(read_file)
+                            # with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                            #     data = json.load(read_file)
                             xs.append(data['x'])
                             ys.append(data['y'])
                             thetas.append(data['theta'])
@@ -128,11 +141,17 @@ class CARLA_points(Dataset):
                             file_number = seq*config.seq_len+i+1
 
                             # semantics
-                            topdowns.append(route_dir+f"/topdown/{str(file_number).zfill(4)}.png")
-                            
-                            # position
-                            with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
-                                data = json.load(read_file)
+                            if 'synth' in sub_root:
+                                topdowns.append(gt_route_dir+"/topdown/"+f"{str(file_number).zfill(4)}.png")
+                                # position
+                                with open(gt_route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
+                            else:
+                                topdowns.append(route_dir+f"/topdown/{str(file_number).zfill(4)}.png")
+                                # position
+                                with open(route_dir + f"/measurements/{str(file_number).zfill(4)}.json", "r") as read_file:
+                                    data = json.load(read_file)
+                                    
                             xs.append(data['x'])
                             ys.append(data['y'])
 
@@ -168,23 +187,48 @@ class CARLA_points(Dataset):
                 preload_dict['velocity'] = preload_velocity
                 np.save(preload_file, preload_dict)
 
-            # load from stored npy
             preload_dict = np.load(preload_file, allow_pickle=True)
-            self.front += preload_dict.item()['front']
-            self.left += preload_dict.item()['left']
-            self.right += preload_dict.item()['right']
-            self.topdown += preload_dict.item()['topdown']
-            self.x += preload_dict.item()['x']
-            self.y += preload_dict.item()['y']
-            self.x_command += preload_dict.item()['x_command']
-            self.y_command += preload_dict.item()['y_command']
-            self.theta += preload_dict.item()['theta']
-            self.steer += preload_dict.item()['steer']
-            self.throttle += preload_dict.item()['throttle']
-            self.brake += preload_dict.item()['brake']
-            self.command += preload_dict.item()['command']
-            self.velocity += preload_dict.item()['velocity']
-            print("Preloading " + str(len(preload_dict.item()['front'])) + " sequences from " + preload_file)
+            if 'synth' in sub_root:
+                self.front += preload_dict.item()['front']
+                self.left += preload_dict.item()['left']
+                self.right += preload_dict.item()['right']
+                self.topdown += preload_dict.item()['topdown']
+                self.x += preload_dict.item()['x']
+                self.y += preload_dict.item()['y']
+                self.x_command += preload_dict.item()['x_command']
+                self.y_command += preload_dict.item()['y_command']
+                self.theta += preload_dict.item()['theta']
+                self.steer += preload_dict.item()['steer']
+                self.throttle += preload_dict.item()['throttle']
+                self.brake += preload_dict.item()['brake']
+                self.command += preload_dict.item()['command']
+                self.velocity += preload_dict.item()['velocity']
+                print("Preloading " + str(len(preload_dict.item()['front'])) + " sequences from " + preload_file)
+            else:
+                
+                if num_synth_routes > 0 and num_synth_routes > num_real_routes:
+                    ratio = int(num_synth_routes / num_real_routes)
+                else:
+                    ratio = 1
+                for _ in range(ratio):
+                    self.front += preload_dict.item()['front']
+                    self.left += preload_dict.item()['left']
+                    self.right += preload_dict.item()['right']
+                    self.topdown += preload_dict.item()['topdown']
+                    self.x += preload_dict.item()['x']
+                    self.y += preload_dict.item()['y']
+                    self.x_command += preload_dict.item()['x_command']
+                    self.y_command += preload_dict.item()['y_command']
+                    self.theta += preload_dict.item()['theta']
+                    self.steer += preload_dict.item()['steer']
+                    self.throttle += preload_dict.item()['throttle']
+                    self.brake += preload_dict.item()['brake']
+                    self.command += preload_dict.item()['command']
+                    self.velocity += preload_dict.item()['velocity']
+                num_real_routes -= 1
+                num_synth_routes -= ratio
+                print("Preloading " + str(len(preload_dict.item()['front'])) + \
+                      " sequences from " + preload_file + " " + str(ratio) + " times")
 
     def __len__(self):
         """Returns the length of the dataset. """
