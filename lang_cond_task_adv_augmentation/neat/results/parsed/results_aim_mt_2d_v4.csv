@@ -1,0 +1,73 @@
+Avg. driving score,0.0
+Avg. route completion,0.0
+Avg. infraction penalty,1.0
+Collisions with pedestrians,0.0
+Collisions with vehicles,0.0
+Collisions with layout,0.0
+Red lights infractions,0.0
+Stop sign infractions,0.0
+Off-road infractions,0.0
+Route deviations,0.0
+Route timeouts,0.0
+Agent blocked,0.0
+""
+route,town,weather,daytime,score mean,score std,completion mean,completion std,penalty mean,penalty std,duration mean,duration std,length mean,length std,collisions_layout mean,collisions_layout std,collisions_pedestrian mean,collisions_pedestrian std,collisions_vehicle mean,collisions_vehicle std,outside_route_lanes mean,outside_route_lanes std,red_light mean,red_light std,route_dev mean,route_dev std,route_timeout mean,route_timeout std,stop_infraction mean,stop_infraction std,vehicle_blocked mean,vehicle_blocked std
+RouteScenario_0,Town01,Rain,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213562373095,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_1,Town01,Clear,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213457848915,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_10,Town03,Clear,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213542142608,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_11,Town03,Cloudy,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135893470783,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_12,Town03,Rain,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135893470783,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_13,Town03,Clear,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213542142608,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_14,Town03,Cloudy,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135893470783,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_15,Town03,Rain,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213542142608,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_16,Town03,Clear,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135893470783,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_17,Town03,Cloudy,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213542142608,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_18,Town04,Rain,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213562373095,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_19,Town04,Clear,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.421350842513,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_2,Town01,Cloudy,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213457848915,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_20,Town04,Cloudy,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213562373095,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_21,Town04,Rain,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.421350842513,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_22,Town04,Clear,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.421350842513,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_23,Town04,Cloudy,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213562373095,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_24,Town04,Rain,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.421350842513,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_25,Town04,Clear,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213562373095,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_26,Town04,Cloudy,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.421350842513,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_3,Town01,Rain,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213562373095,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_4,Town01,Clear,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213562373095,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_5,Town01,Cloudy,Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213457848915,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_6,Town01,Rain,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213457848915,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_7,Town01,Clear,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213457848915,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_8,Town01,Cloudy,Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213457848915,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+RouteScenario_9,Town03,Rain,Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213542142608,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+""
+town,score mean,score std,completion mean,completion std,penalty mean,penalty std,duration mean,duration std,length mean,length std,collisions_layout mean,collisions_layout std,collisions_pedestrian mean,collisions_pedestrian std,collisions_vehicle mean,collisions_vehicle std,outside_route_lanes mean,outside_route_lanes std,red_light mean,red_light std,route_dev mean,route_dev std,route_timeout mean,route_timeout std,stop_infraction mean,stop_infraction std,vehicle_blocked mean,vehicle_blocked std
+Town01,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42134926903086,4.927317096521747e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Town03,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135631223726,2.3456089912179553e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Town04,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135324020035,2.68069594154214e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+""
+weather,score mean,score std,completion mean,completion std,penalty mean,penalty std,duration mean,duration std,length mean,length std,collisions_layout mean,collisions_layout std,collisions_pedestrian mean,collisions_pedestrian std,collisions_vehicle mean,collisions_vehicle std,outside_route_lanes mean,outside_route_lanes std,red_light mean,red_light std,route_dev mean,route_dev std,route_timeout mean,route_timeout std,stop_infraction mean,stop_infraction std,vehicle_blocked mean,vehicle_blocked std
+Clear,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135256585084,4.3570973132603805e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Cloudy,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135252838702,5.2883797257268645e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Rain,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213537272306,3.7448875634492055e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+""
+daytime,score mean,score std,completion mean,completion std,penalty mean,penalty std,duration mean,duration std,length mean,length std,collisions_layout mean,collisions_layout std,collisions_pedestrian mean,collisions_pedestrian std,collisions_vehicle mean,collisions_vehicle std,outside_route_lanes mean,outside_route_lanes std,red_light mean,red_light std,route_dev mean,route_dev std,route_timeout mean,route_timeout std,stop_infraction mean,stop_infraction std,vehicle_blocked mean,vehicle_blocked std
+Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135140447104,4.6094256862603556e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135425172472,4.090944195415855e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135316527268,4.4489028575944456e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+""
+status,score mean,score std,completion mean,completion std,penalty mean,penalty std,duration mean,duration std,length mean,length std,collisions_layout mean,collisions_layout std,collisions_pedestrian mean,collisions_pedestrian std,collisions_vehicle mean,collisions_vehicle std,outside_route_lanes mean,outside_route_lanes std,red_light mean,red_light std,route_dev mean,route_dev std,route_timeout mean,route_timeout std,stop_infraction mean,stop_infraction std,vehicle_blocked mean,vehicle_blocked std
+Failed - Agent couldn't be set up,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135294048947,4.542561104137964e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+""
+weather_daytime,score mean,score std,completion mean,completion std,penalty mean,penalty std,duration mean,duration std,length mean,length std,collisions_layout mean,collisions_layout std,collisions_pedestrian mean,collisions_pedestrian std,collisions_vehicle mean,collisions_vehicle std,outside_route_lanes mean,outside_route_lanes std,red_light mean,red_light std,route_dev mean,route_dev std,route_timeout mean,route_timeout std,stop_infraction mean,stop_infraction std,vehicle_blocked mean,vehicle_blocked std
+Clear-Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135365230294,5.671044080422255e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Clear-Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135376469443,2.225240031617204e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Clear-Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213502805551,3.464141461188573e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Cloudy-Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213502805551,3.464141461188573e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Cloudy-Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135365230294,5.671044080422255e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Cloudy-Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135365230294,5.671044080422255e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Rain-Morning,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.4213502805551,3.464141461188573e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Rain-Night,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135533817677,3.36424672662671e-06,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+Rain-Twilight,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,141.42135556295992,9.536743134829318e-07,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+""
+town,weather,daylight,infraction type,x,y,z
+""
