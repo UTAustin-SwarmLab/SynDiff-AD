@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.getcwd(),'ControlNet/'))
 import ControlNet.config
 from ControlNet.cldm.hack import disable_verbosity, enable_sliced_attention
 from waymo_open_data import WaymoDataset
-
+from copy import deepcopy
 disable_verbosity()
 
 if ControlNet.config.save_memory:
@@ -182,7 +182,7 @@ def get_ade20k(config):
 def get_waymo(config):
     SEGMENTATION = True
     IMAGE_META_DATA = True
-    VALIDATION = True
+    VALIDATION = False
     dataset = WaymoDataset(config.IMAGE.WAYMO, 
                 image_meta_data=IMAGE_META_DATA,
                 segmentation=SEGMENTATION,
@@ -224,9 +224,9 @@ def get_waymo(config):
 def get_bdd(config):
     SEGMENTATION = True
     IMAGE_META_DATA = True
-    VALIDATION = True
+    VALIDATION = False
     
-    dataset = CarlaDataset(config.IMAGE.BDD, 
+    dataset = BDD100KDataset(config.IMAGE.BDD, 
                 image_meta_data=IMAGE_META_DATA,
                 segmentation=SEGMENTATION,
                         validation=VALIDATION)
@@ -244,8 +244,8 @@ def get_bdd(config):
     
     # Obtain the segmentation mask
     prompt_tokens = {}
-    prompt_tokens['a_prompt'] = "Must contain " + CarlaDataset.get_text_description(object_masks, dataset.CLASSES)
-    prompt_tokens['n_prompt'] = "Must not contain " +  BDataset.get_text_description(object_masks, dataset.CLASSES)
+    prompt_tokens['a_prompt'] = "Must contain " + BDD100KDataset.get_text_description(object_masks, dataset.CLASSES)
+    prompt_tokens['n_prompt'] = "Must not contain " +  BDD100KDataset.get_text_description(object_masks, dataset.CLASSES)
     
     semantic_mapped_rgb_mask = dataset.get_mapped_semantic_mask(object_masks)
     invalid_mask = dataset.get_unmapped_mask(object_masks)
@@ -253,17 +253,17 @@ def get_bdd(config):
     source_condition = None
     if prompt_df is not None:
         prompt = prompt_df.loc[
-                    (img_data['file_name'] == prompt_df['context_name'])
+                    (img_data['file_name'] == prompt_df['file_name'])
                 ]['caption'].values[0]
         source_condition = metadata_conditions.loc[
-                    (img_data['file_name'] == metadata_conditions['context_name'])
+                    (img_data['file_name'] == metadata_conditions['file_name'])
                 ]['condition'].values[0]
     return camera_images, semantic_mapped_rgb_mask, prompt_tokens, invalid_mask, prompt, source_condition
 
 def get_carla(config):
     SEGMENTATION = True
     IMAGE_META_DATA = True
-    VALIDATION = True
+    VALIDATION = False
     
     dataset = CARLADataset(config, 
                 image_meta_data=IMAGE_META_DATA,
@@ -531,13 +531,8 @@ def parse_args():
         help='Offset seed for random number generators')
     return  parser.parse_args()
 
-if __name__ == "__main__":
-    
-    args = parse_args()
-    
-    config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
-    config = omegaconf.OmegaConf.load(config_file_name)
-    
+
+def output_single(config):
     synthesizer = ImageSynthesis(config)
    
     #img, seg_mask, object_keys = get_ade20k(config)
@@ -573,9 +568,26 @@ if __name__ == "__main__":
                 if args.experiment == 'carla':
                     prompt = prompt.replace(weather, 'RainyNight')
                 else:
-                    prompt = prompt.replace(weather, 'RainyNight')
-                    prompt = prompt.replace(source_day, day)
+                    target_condition = "Rainy, Night"
+                    source_condition = weather
+                    weather, day = target_condition.split(',') 
+                    source_weather, source_day = source_condition.split(',')
                     
+                    prompt = prompt.replace(source_weather, weather)
+                    prompt = prompt.replace(source_day, day)
+                    # remove all the words associated with the source condition
+
+                    prompt = prompt.replace(source_day.lower(), day)   
+                    
+                    if 'y' in source_weather:
+                        prompt = prompt.replace(' '+source_weather[:-1].lower(), ' '+weather)
+                        if 'y' in weather:
+                            prompt = prompt.replace(source_weather[:-1], weather[:-1])
+                        else:
+                            prompt = prompt.replace(source_weather[:-1], weather)
+                    else:
+                        prompt = prompt.replace(source_weather.lower(), weather)
+                            
             outputs = synthesizer.run_model(img.copy(), 
                                 seg_mask=[seg_mask.copy()],
                                 prompt = prompt,
@@ -601,6 +613,144 @@ if __name__ == "__main__":
                 plt.imshow(output)
                 plt.savefig(os.path.join(save_path, 'output_{}_{}.png'.format(k,i+1)))
                 plt.close()
+                
+def output_styles(args, config):
+    #img, seg_mask, object_keys = get_ade20k(config)
+    # Choose images 
+    
+    synthesizer = ImageSynthesis(config)
+    #img, seg_mask, object_keys = get_ade20k(config)
+    for k in range(20):
+        np.random.seed(k*10+8)
+        if args.experiment == 'waymo':
+            img, seg_mask, object_keys, mask, prompt, weather = get_waymo(config)
+            # Maps for abbr
+            ALL_CONDITIONS = {"Rainy, Night":"rnn", 
+                              "Rainy, Day":"rd", 
+                              "Rainy, Dawn/Dusk":"rdd",
+                              "Clear, Night":"cn",
+                              "Clear, Day":"cd",
+                              "Clear, Dawn/Dusk":"cdd",
+                              "Cloudy, Night":"cln", 
+                              "Cloudy, Day":"cld",
+                              "Cloudy, Dawn/Dusk":"cldd"}
+        elif args.experiment == 'bdd':
+            img, seg_mask, object_keys, mask, prompt, weather = get_bdd(config)
+            ALL_CONDITIONS = {"Rainy, Night":"rnn", 
+                              "Rainy, Day":"rd", 
+                              "Rainy, Dawn/Dusk":"rdd",
+                              "Clear, Night":"cn",
+                              "Clear, Day":"cd",
+                              "Clear, Dawn/Dusk":"cdd",
+                              "Cloudy, Night":"cln", 
+                              "Cloudy, Day":"cld",
+                              "Cloudy, Dawn/Dusk":"cldd"}
+        elif args.experiment == 'carla':
+            img, seg_mask, object_keys, mask, prompt, weather = get_carla(config)
+            ALL_CONDITIONS = {"RainNight":"rnn", 
+                              "RainMorning":"rd", 
+                              "RainTwilight":"rt",
+                              "ClearNight":"cn",
+                              "ClearMorning":"cd",
+                              "ClearTwilight":"ct",
+                              "CloudyNight":"cln", 
+                              "CloudyMorning":"cld",
+                              "CloudyTwilight":"clt"}
+        
+        #     outputs[j+1] = post_process(mask, syn_img, img)
+        save_path = os.path.join(os.getcwd(), config.SAVE.PATH+"/{}".format(args.experiment))
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        plt.figure(figsize=(10, 10))
+        plt.imshow(img)
+        plt.savefig(os.path.join(save_path, 'input_{}_{}.png'.format(k, ALL_CONDITIONS[weather])))
+        plt.close()
+        
+        plt.figure(figsize=(10, 10))
+        plt.imshow(seg_mask)
+        plt.savefig(os.path.join(save_path, 'inputmask_{}_{}.png'.format(k, ALL_CONDITIONS[weather])))
+        plt.close()
+        
+        # Obtain all the remaining conditions to be plotted
+        remaining_conditions = list(ALL_CONDITIONS.keys())
+        remaining_conditions.remove(weather)
+        
+        source_condition = weather
+        for target_condition in remaining_conditions:
+            # Obtaining the images
+            img_prompt = deepcopy(prompt)
+            if isinstance(object_keys, list):
+                prompt_tokens = {'a_prompt': '', 'n_prompt': ''}
+                for key in object_keys:
+                    if key != '-':
+                        prompt_tokens['a_prompt'] += 'same {}, '.format(key)
+                        prompt_tokens['n_prompt'] += 'missing {}, '.format(key)
+            else:
+                prompt_tokens = object_keys
+                
+            if config.GRADIO:
+                gradio_viz(title='control net test', 
+                        synthesizer=synthesizer,
+                        input_image=img.copy(), seg_mask = [seg_mask.copy()], 
+                        server_name='hg22723@swarmcluster1.ece.utexas.edu', server_port=8090,
+                        prompt_tokens=prompt_tokens)
+            else:
+                if img_prompt is None:
+                    img_prompt = '{} weather condition during {} time'.format(target_condition.split(',')[0],
+                                                                          target_condition.split(',')[1])
+                else:
+                    if args.experiment == 'carla':
+                        img_prompt = prompt.replace(weather, target_condition)
+                    else:
+
+                        weather, day = target_condition.split(',') 
+                        source_weather, source_day = source_condition.split(',')
+                        
+                        img_prompt = img_prompt.replace(source_weather, weather)
+                        img_prompt = img_prompt.replace(source_day, day)
+                        # remove all the words associated with the source condition
+
+                        img_prompt = img_prompt.replace(source_day.lower(), day)   
+                        
+                        if 'y' in source_weather:
+                            img_prompt = img_prompt.replace(' '+source_weather[:-1].lower(), ' '+weather)
+                            if 'y' in weather:
+                                img_prompt = img_prompt.replace(source_weather[:-1], weather[:-1])
+                            else:
+                                img_prompt = img_prompt.replace(source_weather[:-1], weather)
+                        else:
+                            img_prompt = img_prompt.replace(source_weather.lower(), weather)
+                                
+                outputs = synthesizer.run_model(img.copy(), 
+                                    seg_mask=[seg_mask.copy()],
+                                    prompt = img_prompt,
+                                    prompt_tokens=prompt_tokens)
+                        
+                results = outputs[1:]
+                for j,syn_img in enumerate(results):            
+                    syn_img = cv2.resize(syn_img, (img.shape[1],
+                                            img.shape[0]), 
+                                    interpolation=cv2.INTER_NEAREST)
+                    outputs[j+1] = syn_img
+                
+
+                for i, output in enumerate(outputs):
+                    plt.figure(figsize=(10, 10))
+                    plt.imshow(output)
+                    plt.savefig(os.path.join(save_path, 'output_{}_{}_{}.png'.format(k,i+1,
+                                                                                     ALL_CONDITIONS[target_condition])))
+                    plt.close()
+
+if __name__ == "__main__":
+    
+    args = parse_args()
+    
+    config_file_name = 'lang_data_synthesis/{}_config.yaml'.format(args.experiment)
+    config = omegaconf.OmegaConf.load(config_file_name)
+    
+    #output_single(config)
+    
+    output_styles(args, config)
                               
 # TODO: Modularization of this function is pending
 # DESIGN_DICT =  [{'type': 'image', 

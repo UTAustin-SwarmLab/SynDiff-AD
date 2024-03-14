@@ -1,4 +1,4 @@
-import ControlNet.config:
+import ControlNet.config
 import sys
 import os
 sys.path.append(os.path.join(os.getcwd(),'ControlNet/'))
