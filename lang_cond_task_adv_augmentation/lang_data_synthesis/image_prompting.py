@@ -267,8 +267,8 @@ class LLaVACaption:
         
         tf.config.set_visible_devices([], 'GPU')
         torch.cuda.set_device('cuda:{}'.format(gpu_id))
-        
         model_name = get_model_name_from_path(model_path)
+        
         tokenizer, model, image_processor, _ = load_pretrained_model(
             model_path, model_base, get_model_name_from_path(model_path),
             load_8bit=load_8bit, load_4bit=load_4bit,

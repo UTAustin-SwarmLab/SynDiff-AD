@@ -40,15 +40,29 @@ class CLIPClassifier:
         self.config = config
         self.dataset: WaymoDataset = dataset
         self.device = "cuda:1" if torch.cuda.is_available() else "cpu"
-        self.model, _ , transform = open_clip.create_model_and_transforms(
-            'hf-hub:laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K',
+        # self.model, _ , transform = open_clip.create_model_and_transforms(
+        #     'hf-hub:laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K',
+        #     device=self.device
+        # ) 
+        # self.model.eval()
+        # self.tokenizer = open_clip.get_tokenizer(
+        #     'hf-hub:laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K'
+        # )
+        
+
+        # self.model, _ , transform = open_clip.create_model_and_transforms(
+        #     'hf-hub:timm/ViT-SO400M-14-SigLIP-384',
+        #     device=self.device
+        # ) 
+        # self.transform =  transform
+        self.model,  self.transform= open_clip.create_model_from_pretrained(
+            'hf-hub:timm/ViT-SO400M-14-SigLIP-384',
             device=self.device
-        ) 
+        )
         self.model.eval()
         self.tokenizer = open_clip.get_tokenizer(
-            'hf-hub:laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K'
+            'hf-hub:timm/ViT-SO400M-14-SigLIP-384'
         )
-        
         self.prompts = deepcopy(self.config.ROBUSTIFICATION.test_conditions)
         for j, description in enumerate(self.config.ROBUSTIFICATION.test_conditions):
             for i, conditions in enumerate(description):
@@ -61,11 +75,12 @@ class CLIPClassifier:
         # self.text_inputs_conditions = torch.cat([clip.tokenize(description) for description \
         #       in conditions_list]).to(self.device)
         #self.text_features_conditions = self.model.encode_text(self.text_inputs_conditions)
-        self.transform = transforms.Compose([
-        transform.transforms[0],
-        transform.transforms[1],
-        transform.transforms[-1]# Convert to a PyTorch tensor
-        ])
+        # self.transform = transforms.Compose([
+        # transform.transforms[0],
+        # transform.transforms[1],
+        # transform.transforms[-1]# Convert to a PyTorch tensor
+        # ])
+        
         
         collate_fn = functools.partial(
                 collator, 
@@ -103,8 +118,17 @@ class CLIPClassifier:
         image: np.ndarray
     ):
         camera_images = image.transpose(0, 3, 1, 2)
-        camera_images = self.transform(torch.tensor(camera_images).to(torch.float32)/255)
-        images = camera_images.to(self.device)
+        
+        # Convert each image in the batch from NumPy array to PIL Image and apply transformations
+        
+        pil_images = [Image.fromarray(img.transpose(1, 2, 0).astype(np.uint8)).convert('RGB')
+                    for img in camera_images]
+        
+        # Apply transformations (self.transform expects PIL images)
+        transformed_images = torch.stack([self.transform(img) for img in pil_images])
+        
+        # Move images to device
+        images = transformed_images.to(self.device)
         with torch.no_grad():
             image_features = self.model.encode_image(images)
 
