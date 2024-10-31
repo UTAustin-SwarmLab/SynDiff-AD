@@ -1,10 +1,10 @@
 config_path_sd15: 'ControlNet/models/cldm_v15.yaml'
 path_sd15 : './ControlNet/models/v1-5-pruned.ckpt'
 path_sd15_with_control : './ControlNet/models/control_v11p_sd15_seg.pth'
-path_init_ckpt: './ControlNet/models/control_v11p_sd15_seg.ckpt'
+path_init_ckpt: './ControlNet/models/control_v11p_sd15_av3.ckpt'
 batch_size : 2
 logger_freq : 300
-learning_rate : 1e-5
-sd_locked : True
+learning_rate : 1e-6
+sd_locked : False
 only_mid_control : False
 

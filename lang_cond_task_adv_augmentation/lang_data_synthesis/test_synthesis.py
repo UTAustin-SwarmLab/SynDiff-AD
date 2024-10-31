@@ -8,7 +8,13 @@ import torch
 
 from mmengine import Config
 
-from torchvision.models import resnet50
+
+from torchvision.models import resnet50, inception_v3
+from torchvision import transforms
+from torch import nn
+
+import torch
+import open_clip
 import os
 import json
 import pandas as pd
@@ -24,6 +30,37 @@ from tqdm import tqdm
 from argparse import ArgumentParser
 from mmengine.runner.checkpoint import _load_checkpoint, _load_checkpoint_to_model
 init_default_scope('mmseg')
+
+class PartialInceptionNetwork(nn.Module):
+
+    def __init__(self, transform_input=True):
+        super().__init__()
+        self.inception_network = inception_v3(pretrained=True)
+        self.inception_network.Mixed_7c.register_forward_hook(self.output_hook)
+        self.transform_input = transform_input
+
+    def output_hook(self, module, input, output):
+        # N x 2048 x 8 x 8
+        self.mixed_7c_output = output
+
+    def forward(self, x):
+        """
+        Args:
+            x: shape (N, 3, 299, 299) dtype: torch.float32 in range 0-1
+        Returns:
+            inception activations: torch.tensor, shape: (N, 2048), dtype: torch.float32
+        """
+        assert x.shape[1:] == (3, 299, 299), "Expected input shape to be: (N,3,299,299)" +\
+                                             ", but got {}".format(x.shape)
+
+        # Trigger output hook
+        self.inception_network(x)
+
+        # Output: N x 2048 x 1 x 1 
+        activations = self.mixed_7c_output
+        activations = torch.nn.functional.adaptive_avg_pool2d(activations, (1,1))
+        activations = activations.view(x.shape[0], 2048)
+        return activations
 
 def load_checkpoint(    model,
                         filename: str,
@@ -198,7 +235,7 @@ def collate_fn(batch):
             collated_batch[key] = torch.stack([sample[key] for sample in batch])
         else:
             collated_batch[key] = [sample[key] for sample in batch]
-    return collated_batch
+    return collaed_batch
 
 class EvaluateSynthesisFID:
 
@@ -250,9 +287,7 @@ class EvaluateSynthesisFID:
                     PALLETE = self.config.IMAGE.BDD.PALLETE),
                 pipeline=[
                     dict(type='AVResize', scale=[512,512], keep_ratio=False),
-                    dict(type='PackSegInputs', meta_keys=['context_name',
-                                                        'context_frame',
-                                                        'camera_id',
+                    dict(type='PackSegInputs', meta_keys=['file_name',
                                                         'ori_shape',
                                                         'img_shape',
                                                         'scale_factor',
@@ -267,7 +302,7 @@ class EvaluateSynthesisFID:
         self.real_data_loader = torch.utils.data.DataLoader(
             self.real_data,
             batch_size=16,
-            num_workers=16,
+            num_workers=4,
             persistent_workers=True,
             shuffle=False,
             collate_fn=collate_fn
@@ -300,9 +335,7 @@ class EvaluateSynthesisFID:
                     PALLETE = self.config.IMAGE.BDD.PALLETE),
                 pipeline=[
                     dict(type='AVResize', scale=[512,512], keep_ratio=False),
-                    dict(type='PackSegInputs', meta_keys=['context_name',
-                                                        'context_frame',
-                                                        'camera_id',
+                    dict(type='PackSegInputs', meta_keys=['file_name',
                                                         'ori_shape',
                                                         'img_shape',
                                                         'scale_factor',
@@ -317,7 +350,7 @@ class EvaluateSynthesisFID:
         self.fake_data_loader = torch.utils.data.DataLoader(
             self.fake_data,
             batch_size=16,
-            num_workers=16,
+            num_workers=4,
             persistent_workers=True,
             shuffle=False,
             collate_fn=collate_fn
@@ -329,18 +362,44 @@ class EvaluateSynthesisFID:
             model_config = Config.fromfile('lang_data_synthesis/synthesis_results/swin_t_model.py')
             
             model = MODELS.build(model_config.model).cuda()
-            load_checkpoint(model, 'lang_data_synthesis/synthesis_results/swin-t.pth')
+            load_checkpoint(model, 'lang_data_synthesi/synthesis_results/swin-t.pth')
             self.num_features = model.backbone.num_features[-1]
             # model.load_state_dict(torch.load('lang_data_synthesis/synthesis_results/swin-t.pth'))
+            self.feature_extractor = model.backbone
+            self.data_preprocessor = model.data_preprocessor
         elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
             model_config = Config.fromfile('lang_data_synthesis/synthesis_results/r_50_model.py')
             model = MODELS.build(model_config.model).cuda()
             load_checkpoint(model, 'lang_data_synthesis/synthesis_results/r50.pth')
             #model.load_state_dict(torch.load('lang_data_synthesis/synthesis_results/r50.pth'))    
             self.num_features = model.backbone.feat_dim
+            self.feature_extractor = model.backbone
+            self.data_preprocessor = model.data_preprocessor
+        elif self.config.SYN_DATASET_GEN.fid_test_model== 'IV3':
+            model = PartialInceptionNetwork()
+            model = model.cuda()
+            self.feature_extractor = model
+            self.num_features = 2048
+            self.data_preprocessor = transforms.Compose([
+                transforms.Resize(299),
+                transforms.CenterCrop(299),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
             
-        self.feature_extractor = model.backbone
-        self.data_preprocessor = model.data_preprocessor
+        elif self.config.SYN_DATASET_GEN.fid_test_model== 'CLIP':
+            model, _ , transform = open_clip.create_model_and_transforms(
+            'hf-hub:laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K',
+            device=torch.device('cuda:0')
+            ) 
+            
+            model.eval()
+            self.num_features = 768
+            self.feature_extractor = lambda x: model.encode_image(x)
+            self.data_preprocessor = transforms.Compose([
+                transform.transforms[0],
+                transform.transforms[1],
+                transform.transforms[-1]# Convert to a PyTorch tensor
+                ])
         
         # Initialize per class FID metrics
         self.fid_dict = {}
@@ -363,45 +422,70 @@ class EvaluateSynthesisFID:
     
         with torch.no_grad():
             for j,data in tqdm(enumerate(self.real_data_loader), total=len(self.real_data_loader)):
-                # if j>=20:
-                #     break
-                data = self.data_preprocessor(data)
+
+                if self.config.SYN_DATASET_GEN.fid_test_model== 'IV3' \
+                    or self.config.SYN_DATASET_GEN.fid_test_model== 'CLIP':
+                    
+                    images = data['inputs']
+                    images = images.to(torch.device("cuda:0")).to(torch.float32)/255.0
+                    images = self.data_preprocessor(images)
+                else:
+                    data = self.data_preprocessor(data)
+                    images = data['inputs']
                 #data = self.real_data[j]
-                images = data['inputs']
+                    
                 data_samples = data['data_samples']
                 # Extract features from the real data
                 real_features = self.feature_extractor(images)
-                N, C, H, W = real_features[-1].shape
+                
                 if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
+                    N, C, H, W = real_features[-1].shape
                     real_features = real_features[-1].reshape(N, C, H*W).mean(dim=-1)
                 elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
+                    N, C, H, W = real_features[-1].shape
                     real_features = real_features[-1].reshape(N, C, H*W).max(dim=-1)[0]
                 real_features = real_features.cpu()
                 for i in range(0, len(data_samples)):
                     meta_data = data_samples[i].metainfo
-                    condition = self.real_metadata_conditions.loc[
-                        (self.real_metadata_conditions['context_name'] == meta_data['context_name']) & 
-                        (self.real_metadata_conditions['context_frame'] == meta_data['context_frame']) & 
-                        (self.real_metadata_conditions['camera_id'] == meta_data['camera_id']) 
+                    if self.config.experiment == 'waymo':
+                        condition = self.real_metadata_conditions.loc[
+                            (self.real_metadata_conditions['context_name'] == meta_data['context_name']) & 
+                            (self.real_metadata_conditions['context_frame'] == meta_data['context_frame']) & 
+                            (self.real_metadata_conditions['camera_id'] == meta_data['camera_id']) 
+                        ]['condition'].values[0]
+                    elif self.config.experiment == 'bdd':
+                        print(self.real_metadata_conditions.columns)
+                        print(meta_data.keys())
+                        condition = self.real_metadata_conditions.loc[
+                            (self.real_metadata_conditions['file_name'] == meta_data['file_name']) 
                     ]['condition'].values[0]
                     # Update the FID metric with the features
                     self.fid_dict[condition].update(real_features[[i]], real=True)
                 self.final_fid.update(real_features, real=True)
             
             for j,data in tqdm(enumerate(self.fake_data_loader), total=len(self.fake_data_loader)):
-                # if j>=20:
-                #     break
-                #data = self.fake_data[j]
-                data = self.data_preprocessor(data)
-                images = data['inputs']
+
+                if self.config.SYN_DATASET_GEN.fid_test_model== 'IV3' \
+                    or self.config.SYN_DATASET_GEN.fid_test_model== 'CLIP':
+                    
+                    images = data['inputs']
+                    images = images.to(torch.device("cuda:0")).to(torch.float32)/255.0
+                    images = self.data_preprocessor(images)
+                else:
+                    data = self.data_preprocessor(data)
+                    images = data['inputs']
+                #data = self.real_data[j]
+                    
                 data_samples = data['data_samples']
                 # Extract features from the real data
                
                 fake_features = self.feature_extractor(images)
-                N, C, H, W = fake_features[-1].shape
+                
                 if self.config.SYN_DATASET_GEN.fid_test_model== 'Swin-T':
+                    N, C, H, W = fake_features[-1].shape
                     fake_features = fake_features[-1].reshape(N, C, H*W).mean(dim=-1)
                 elif self.config.SYN_DATASET_GEN.fid_test_model== 'R50':
+                    N, C, H, W = fake_features[-1].shape
                     fake_features = fake_features[-1].reshape(N, C, H*W).max(dim=-1)[0]
                 fake_features = fake_features.cpu()
                 for i in range(0, len(data_samples)):
@@ -409,6 +493,8 @@ class EvaluateSynthesisFID:
                     condition = self.fake_metadata_conditions.loc[
                         (self.fake_metadata_conditions['filename'] == meta_data['file_name']) 
                     ]['condition'].values[0]
+                    condition = condition.strip("[]")
+                    condition = condition.strip("''")
                 # Update the FID metric with the features
                     self.fid_dict[condition].update(fake_features[[i]], real=False)
                 self.final_fid.update(fake_features, real=False)

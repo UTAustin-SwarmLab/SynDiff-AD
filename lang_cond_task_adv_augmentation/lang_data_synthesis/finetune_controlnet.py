@@ -77,6 +77,7 @@ class ControlNetFineTune:
         dataloader = DataLoader(dataset, num_workers=self.args.num_workers,
                                 batch_size=self.config.batch_size,
                                 shuffle=True)
+
         logger = ImageLogger(batch_frequency=self.config.logger_freq)
         trainer = pl.Trainer(gpus=self.args.num_gpus, precision=32, callbacks=[logger])#, logger= wandb_logger)
 
@@ -116,5 +117,6 @@ if  __name__ == "__main__":
     args = parse_args()
     tf.config.set_visible_devices([], 'GPU')
     config = OmegaConf.load('lang_data_synthesis/finetune_config.yaml')
+
     finetune = ControlNetFineTune(config, args)
     finetune.finetune_model()

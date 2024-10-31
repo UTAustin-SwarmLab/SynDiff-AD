@@ -39,7 +39,7 @@ class CLIPClassifier:
                  dataset: WaymoDataset):
         self.config = config
         self.dataset: WaymoDataset = dataset
-        self.device = "cuda:1" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         # self.model, _ , transform = open_clip.create_model_and_transforms(
         #     'hf-hub:laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K',
         #     device=self.device
@@ -57,6 +57,7 @@ class CLIPClassifier:
         # self.transform =  transform
         self.model,  self.transform= open_clip.create_model_from_pretrained(
             'hf-hub:timm/ViT-SO400M-14-SigLIP-384',
+
             device=self.device
         )
         self.model.eval()

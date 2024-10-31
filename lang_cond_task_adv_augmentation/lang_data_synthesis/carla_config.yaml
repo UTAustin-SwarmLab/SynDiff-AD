@@ -67,7 +67,7 @@ IMAGE:
 control_net:
   CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
   MODEL_PATH: 'ControlNet/models/control_v11p_sd15_seg.pth'
-  FT_MODEL_PATH: 'ControlNet/models/control_v11p_sd15_avcarla.ckpt' # TODO : change this to the validation path
+  FT_MODEL_PATH: 'ControlNet/models/control_v11p_sd15_avcarlack1.ckpt' # TODO : change this to the validation path
   SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
   USE_FINETUNED: True
 SEGMENT_MODEL: 
@@ -103,7 +103,7 @@ LLAVACAPTION:
     conditions_path: None # TODO : change this to the validation path
     captions_path_multi: 'carla/seg_captions_train_{}.csv' # TODO : change this to the validation path
     captions_path_single: 'carla/seg_captions_train.csv' # TODO : change this to the validation path
-    model_per_gpu: 1
+    model_per_gpu: 2
 ROBUSTIFICATION:       
   test_conditions : [
     ["ClearMorning", "CloudyMorning", "RainMorning", "ClearNight", "CloudyNight", "RainNight","ClearTwilight", "CloudyTwilight", "RainTwilight"]

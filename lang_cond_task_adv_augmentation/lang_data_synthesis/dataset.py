@@ -353,3 +353,4 @@ if __name__ == "__main__":
         print(i, data['jpg'].shape, data['txt'], data['hint'].shape)
         if i == 20:
             break
+

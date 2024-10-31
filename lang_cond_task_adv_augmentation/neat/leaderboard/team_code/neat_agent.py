@@ -204,11 +204,11 @@ class MultiTaskAgent(autonomous_agent.AutonomousAgent):
 
 		if self.step < self.config.seq_len:
 			rgb = torch.from_numpy(scale_and_crop_image(Image.fromarray(tick_data['rgb']))).unsqueeze(0)
-			self.input_buffer['rgb'].append(rgb.to('cuda', dtype=torch.float32))
+			self.input_buffer['rgb'].append(rgb.to('cuda', dtype=torch.float32)/255.0)
 			rgb_left = torch.from_numpy(scale_and_crop_image(Image.fromarray(tick_data['rgb_left']))).unsqueeze(0)
-			self.input_buffer['rgb_left'].append(rgb_left.to('cuda', dtype=torch.float32))
+			self.input_buffer['rgb_left'].append(rgb_left.to('cuda', dtype=torch.float32)/255.0)
 			rgb_right = torch.from_numpy(scale_and_crop_image(Image.fromarray(tick_data['rgb_right']))).unsqueeze(0)
-			self.input_buffer['rgb_right'].append(rgb_right.to('cuda', dtype=torch.float32))
+			self.input_buffer['rgb_right'].append(rgb_right.to('cuda', dtype=torch.float32)/255.0)
 
 			control = carla.VehicleControl()
 			control.steer = 0.0
@@ -226,15 +226,15 @@ class MultiTaskAgent(autonomous_agent.AutonomousAgent):
 
 		rgb = torch.from_numpy(scale_and_crop_image(Image.fromarray(tick_data['rgb']))).unsqueeze(0)
 		self.input_buffer['rgb'].popleft()
-		self.input_buffer['rgb'].append(rgb.to('cuda', dtype=torch.float32))
+		self.input_buffer['rgb'].append(rgb.to('cuda', dtype=torch.float32)/255.0)
 		
 		rgb_left = torch.from_numpy(scale_and_crop_image(Image.fromarray(tick_data['rgb_left']))).unsqueeze(0)
 		self.input_buffer['rgb_left'].popleft()
-		self.input_buffer['rgb_left'].append(rgb_left.to('cuda', dtype=torch.float32))
+		self.input_buffer['rgb_left'].append(rgb_left.to('cuda', dtype=torch.float32)/255.0)
 		
 		rgb_right = torch.from_numpy(scale_and_crop_image(Image.fromarray(tick_data['rgb_right']))).unsqueeze(0)
 		self.input_buffer['rgb_right'].popleft()
-		self.input_buffer['rgb_right'].append(rgb_right.to('cuda', dtype=torch.float32))
+		self.input_buffer['rgb_right'].append(rgb_right.to('cuda', dtype=torch.float32)/255.0)
 		
 		images = []
 		for i in range(self.config.seq_len):

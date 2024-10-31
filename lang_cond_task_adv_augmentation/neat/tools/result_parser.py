@@ -157,6 +157,7 @@ def main():
                             "length": route["meta"]["route_length"],
                             "score": route["scores"]["score_composed"],
                             "completion":route["scores"]["score_route"],
+                            "penalty": route["scores"]["score_penalty"],
                             "status": route["status"],
                             "infractions": [(key,
                                             len(item),
@@ -182,7 +183,7 @@ def main():
                 completions = np.array([scenario["completion"] for scenario in route_scenarios_per_subcategory[subcategory]])
                 durations = np.array([scenario["duration"] for scenario in route_scenarios_per_subcategory[subcategory]])
                 lengths = np.array([scenario["length"] for scenario in route_scenarios_per_subcategory[subcategory]])
-
+                penalties = np.array([scenario["penalty"] for scenario in route_scenarios_per_subcategory[subcategory]])
                 infractions = np.array([[infraction[1] for infraction in scenario["infractions"]] 
                             for scenario in route_scenarios_per_subcategory[subcategory]])
 
@@ -191,12 +192,13 @@ def main():
                 durations_combined = (durations.mean(), durations.std())
                 lengths_combined = (lengths.mean(), lengths.std())
                 infractions_combined = [(mean,std) for mean,std in zip(infractions.mean(axis=0),infractions.std(axis=0))]
-
+                penalties_combined = (penalties.mean(), penalties.std())
                 evaluation_per_subcategory[subcategory] = {"score":scores_combined,
                                                         "completion": completions_combined,
                                                         "duration":durations_combined,
                                                         "length":lengths_combined,
-                                                        "infractions": infractions_combined} 
+                                                        "infractions": infractions_combined,
+                                                        "penalty": penalties_combined} 
             evaluation_filtered[filter]=evaluation_per_subcategory
 
         # write output csv file
@@ -216,7 +218,7 @@ def main():
         for infraction in route_scenarios[0]["infractions"]:
             infractions_types.append(infraction[0]+" mean")
             infractions_types.append(infraction[0]+" std")
-        csv_writer_object_daytime.writerow(["weather_daytime","score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
+        csv_writer_object_daytime.writerow(["weather_daytime","score mean","score std","completion mean","completion std","penalty mean", "penalty std","duration mean","duration std","length mean","length std"]+
                                     infractions_types)
         for key,item in evaluation_filtered["weather_daytime"].items():
             infractions_output = []
@@ -226,6 +228,7 @@ def main():
             csv_writer_object_daytime.writerow([key,
                                                 item["score"][0],item["score"][1],
                                                 item["completion"][0],item["completion"][1],
+                                                item["penalty"][0],item["penalty"][1],
                                                 item["duration"][0],item["duration"][1],
                                                 item["length"][0],item["length"][1]]+
                                                 infractions_output)
@@ -237,10 +240,10 @@ def main():
 
             # route aggregation table has additional columns
             if filter == "route":
-                csv_writer_object.writerow([filter,"town","weather","daytime","score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
+                csv_writer_object.writerow([filter,"town","weather","daytime","score mean","score std","completion mean","completion std","penalty mean", "penalty std","duration mean","duration std","length mean","length std"]+
                                     infractions_types)
             else:
-                csv_writer_object.writerow([filter,"score mean","score std","completion mean","completion std","duration mean","duration std","length mean","length std"]+
+                csv_writer_object.writerow([filter,"score mean","score std","completion mean","completion std","penalty mean", "penalty std","duration mean","duration std","length mean","length std"]+
                                     infractions_types)
             
             for key,item in evaluation_filtered[filter].items():
@@ -255,6 +258,7 @@ def main():
                                                 route_matching[route_to_id[key]]["daytime"],
                                                 item["score"][0],item["score"][1],
                                                 item["completion"][0],item["completion"][1],
+                                                item["penalty"][0],item["penalty"][1],
                                                 item["duration"][0],item["duration"][1],
                                                 item["length"][0],item["length"][1]]+
                                                 infractions_output)
@@ -262,6 +266,7 @@ def main():
                     csv_writer_object.writerow([key,
                                                 item["score"][0],item["score"][1],
                                                 item["completion"][0],item["completion"][1],
+                                                item["penalty"][0],item["penalty"][1],
                                                 item["duration"][0],item["duration"][1],
                                                 item["length"][0],item["length"][1]]+
                                                 infractions_output)

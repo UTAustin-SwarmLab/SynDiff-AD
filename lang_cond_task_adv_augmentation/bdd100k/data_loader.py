@@ -423,4 +423,3 @@ class BDD100KDataset(ExpDataset):
         
         return self._load_item(data)
         
-    

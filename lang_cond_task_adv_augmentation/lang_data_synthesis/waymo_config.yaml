@@ -5,26 +5,26 @@ IMAGE:
     DATASET_PATH : 'ADE20K/dataset/' # separate path for waymo
   WAYMO:
     # All waymo parameters @markdown #### Replace this path with your own tfrecords. 
-    TRAIN_DIR: '/store/datasets/waymo/training/' #@param {type:"string"}
+    TRAIN_DIR: '/home/hg22723/datasets/waymo/training/' #@param {type:"string"}
     #@markdown #### Replace this directory with your own dataset folder for evaluation.
-    EVAL_DIR: '/store/datasets/waymo/validation/' #@param {type: "string"}
+    EVAL_DIR: '/home/hg22723/datasets/waymo/validation/' #@param {type: "string"}
     #@markdown #### Replace this path with the real path. Each line of the file is the "\, \" of a frame with camera segmentation labels.
     TEST_SET_SOURCE: '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt' #@param {type: "string"} 
 
     #@markdown #### Replace this directory with your own testing dataset folder.
-    TEST_DIR: '/store/datasets/waymo/testing/' #@param {type: "string"}
+    TEST_DIR: '/home/hg22723/datasets/waymo/testing/' #@param {type: "string"}
     # Visualization Path
     VIZ_DIR: '../waymo_data/visualization/' #@param {type: "string"}
     NUM_CPU: 16 #@param {type: "integer"}
     #which camera frames to save
     SAVE_FRAMES: [0,1,2] #@param {type: "LIST"}
     SAVE_DATA: True
-    PALLETE: 'coco' # Choices: coco, ade20k, waymo, cocofull
+    PALLETE: 'cocofull' # Choices: coco, ade20k, waymo, cocofull
   BDD100k:
 control_net:
   CONFIG_PATH: 'ControlNet/models/cldm_v15.yaml'
   MODEL_PATH: 'ControlNet/models/control_v11p_sd15_seg.pth'
-  FT_MODEL_PATH: 'ControlNet/models/control_v11p_sd15_av2.ckpt'
+  FT_MODEL_PATH: 'ControlNet/models/control_v11p_sd15_av3.ckpt'
   SD_CHECKPOINT: 'ControlNet/models/v1-5-pruned.ckpt'
 SEGMENT_MODEL: 
   TYPE: 'Uniformer' # TODO: figure out how the model path is supposed to be load
@@ -39,7 +39,7 @@ SYNTHESIS_PARAMS:
   IMAGE_RESOLUTION: 512
   DDIMSTEPS : 50
   SCALE: 9.0
-  SEED: 2000
+  SEED: -1
   ETA: 0.00
   INIT_NOISE: 1.0
   ANNOTATOR: 'Seg_OFADE20K'
@@ -77,8 +77,8 @@ ROBUSTIFICATION:
 SYN_DATASET_GEN:
   target_prob_soft: 0.00001
   source_prob_soft: 2.25
-  num_synthetic_images: 5000
-  dataset_path: '/store/harsh/data/waymo_synthetic_ft/' # waymo_syntheitc_nollava if use_llava_prompt is False
+  num_synthetic_images: 7500
+  dataset_path: '/home/hg22723/synthdata/waymo_synthetic_ft_rct/' # waymo_syntheitc_nollava if use_llava_prompt is False
   segmentation: True
   conditions_path: 'waymo_open_data/'
   use_llava_prompt: True
