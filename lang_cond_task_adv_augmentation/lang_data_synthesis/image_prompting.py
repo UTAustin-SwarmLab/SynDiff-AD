@@ -211,7 +211,7 @@ class LLaVACaption:
                     (conditions_metadata['file_name'] == image_data['file_name'])
             ]['condition'].values.tolist()[0]
         elif dataset_type == 'carla': 
-            caption = " This image is taken during {} weather and day condition. ".format(image_data['condition']) + caption
+            caption = " This image is taken during {} conditions. ".format(image_data['condition']) + caption
         
         if dataset_type == 'waymo' or dataset_type == 'bdd':
             image_data['condition'] = condition_data
