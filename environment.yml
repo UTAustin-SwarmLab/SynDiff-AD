@@ -8,7 +8,7 @@ dependencies:
   - pip=20.3
   - cudatoolkit
   - pytorch
-  - pytorch-cuda==11.8
+  - pytorch-cuda=11.8
   - torchvision
   - numpy
   - pip:
@@ -23,7 +23,7 @@ dependencies:
       - streamlit==1.12.1
       - webdataset==0.2.5
       - kornia==0.6
-      - open_clip_torch==2.0.2
+      - open_clip_torch
       - invisible-watermark>=0.1.5
       - streamlit-drawable-canvas==0.8.0
       - torchmetrics==0.6.0
@@ -53,4 +53,5 @@ dependencies:
       - gradio_client==0.5.1
       - numpy==1.21.5
       - ipdb==0.13.13
+      - timm
       - git+https://github.com/openai/CLIP.git

@@ -13,10 +13,10 @@ This is a template repository. Please initialize your python project using this 
 6.  To install and setup mmsegmentation
    ```
    pip install -U openmim
-   mim install mmengine
-   mim install "mmcv>=2.0.0"
-   pip install "mmdet>=3.0.0rc4"
-   pip install "mmsegmentation>=1.0.0"
+   mim install mmengine==0.10.3
+   mim install "mmcv>=2.1.0"
+   mim install "mmdet==3.3.0"
+   mim install "mmsegmentation>=1.0.0"
    ```
    Ignore the dependecy conflict of numpy 1.21.5 and pip install numpy==1.23.1- works seamlessly
 
