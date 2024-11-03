@@ -2,7 +2,7 @@
 dataset_type = 'WaymoDatasetMM'
 data_root = ''
 
-crop_size = (960, 640)
+crop_size = (512, 512)
 num_classes = 29
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),

@@ -1,11 +1,13 @@
 # dataset settings
-dataset_type = 'MixedWaymoDatasetMM'
+dataset_type = 'WaymoDatasetMM'
 data_root = ''
 
 crop_size = (512, 512)
 num_classes = 29
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
+    dict(type='RandomFlip', prob=0.5),
+    dict(type='PhotoMetricDistortion'),
     dict(type='PackSegInputs', meta_keys=['context_name',
                                           'context_frame',
                                           'camera_id',
@@ -32,12 +34,10 @@ train_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_config=dict(
-            DATASET_DIR = '/store/harsh/data/waymo_synthetic_ft_ceq/',
             TRAIN_DIR = '/store/datasets/waymo/training/', 
             EVAL_DIR = '/store/datasets/waymo/validation/',
             TEST_SET_SOURCE = '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt',
-            SAVE_FRAMES = [0,1,2]
-        ),
+            SAVE_FRAMES = [0,1,2]),
         pipeline=train_pipeline,
         validation=False,
         segmentation=True,
@@ -53,12 +53,10 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_config=dict(
-            DATASET_DIR = '/store/harsh/data/waymo_synthetic_ft_rct/',
             TRAIN_DIR = '/store/datasets/waymo/training/', 
             EVAL_DIR = '/store/datasets/waymo/validation/',
             TEST_SET_SOURCE = '/content/waymo-open-dataset/tutorial/2d_pvps_validation_frames.txt',
-            SAVE_FRAMES = [0,1,2]
-        ),
+            SAVE_FRAMES = [0,1,2]),
         pipeline=test_pipeline,
         validation=True,
         segmentation=True,

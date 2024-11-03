@@ -1,17 +1,17 @@
-# dataset settings
-dataset_type = 'SynthWaymoDatasetMM'
-data_root = ''
-
+_base_ = ['mask2former_r50_8xb2-90k_waymo-960x640.py']
 crop_size = (512, 512)
-num_classes = 29
+
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
+    dict(type='RandomFlip', prob=0.5),
+    dict(type='PhotoMetricDistortion'),
     dict(type='PackSegInputs', meta_keys=['context_name',
                                           'context_frame',
                                           'camera_id',
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
+                                          'condition',
                                           'reduce_zero_label'])
 ]
 test_pipeline = [
@@ -22,41 +22,35 @@ test_pipeline = [
                                           'ori_shape',
                                           'img_shape',
                                           'scale_factor',
+                                          'condition',
                                           'reduce_zero_label'])
 ]
+data_preprocessor = dict(
+    type='SegDataPreProcessor',
+    mean=[123.675, 116.28, 103.53],
+    std=[58.395, 57.12, 57.375],
+    bgr_to_rgb=False,
+    pad_val=0,
+    seg_pad_val=255,
+    size=crop_size,
+    test_cfg=dict(size_divisor=32)
+    )
+
 train_dataloader = dict(
-    batch_size=4,
-    num_workers=4,
-    persistent_workers=True,
-    sampler=dict(type='InfiniteSampler', shuffle=True),
+    batch_size=3,
+    num_workers=3,
     dataset=dict(
-        type=dataset_type,
-        data_config=dict(
-            DATASET_DIR = '/store/harsh/data/waymo_synthetic/'
-        ),
         pipeline=train_pipeline,
-        validation=False,
-        segmentation=True,
-        image_meta_data=True,
-        serialize_data=True
-        ))
+        )
+  )
 
 val_dataloader = dict(
-    batch_size=4,
-    num_workers=4,
-    persistent_workers=True,
-    sampler=dict(type='DefaultSampler', shuffle=False),
-    dataset=dict(
-        type=dataset_type,
-        data_config=dict(
-            DATASET_DIR = '/store/harsh/data/waymo_synthetic/'
-        ),
+    batch_size=16,
+    num_workers=16,
+        dataset=dict(
         pipeline=test_pipeline,
-        validation=True,
-        segmentation=True,
-        image_meta_data=True,
-        serialize_data=True
-        ))
+    )
+   )
+
 test_dataloader = val_dataloader
-val_evaluator = dict(type='IoUMetric', iou_metrics=['mIoU'])
-test_evaluator = val_evaluator
+model = dict(data_preprocessor=data_preprocessor)

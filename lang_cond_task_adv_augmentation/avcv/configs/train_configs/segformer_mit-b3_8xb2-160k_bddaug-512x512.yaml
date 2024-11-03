@@ -1,8 +1,7 @@
-model_name: 'segformer_mit-b3_8xb2-160k_synthwaymo-512x512'
+model_name: 'segformer_mit-b3_8xb2-160k_bddaug-512x512'
 model_config_path: 'avcv/configs/models/'
 load_model_paths: 'avcv/model_weights/segformer_mit-b3_512x512_160k_ade20k_20210726_081410-962b98d2.pth'
 work_dir: '/store/harsh/work_dirs/'
-source_model: 'segformer_mit-b3_8xb2-160k_waymo-512x512'
 max_iters: 80000
 val_interval: 20000
 logger_interval: 5
