@@ -35,16 +35,16 @@ data_preprocessor = dict(
     )
 
 train_dataloader = dict(
-    batch_size=3,
-    num_workers=3,
+    batch_size=4,
+    num_workers=4,
     dataset=dict(
         pipeline=train_pipeline,
         )
   )
 
 val_dataloader = dict(
-    batch_size=16,
-    num_workers=16,
+    batch_size=4,
+    num_workers=4,
         dataset=dict(
         pipeline=test_pipeline,
     )

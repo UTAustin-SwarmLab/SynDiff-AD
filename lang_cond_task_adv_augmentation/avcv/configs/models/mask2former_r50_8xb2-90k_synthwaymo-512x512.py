@@ -157,16 +157,16 @@ model = dict(
     test_cfg=dict(mode='whole'))
 
 train_dataloader = dict(
-    batch_size=8,
-    num_workers=8,
+    batch_size=4,
+    num_workers=4,
     dataset=dict(
         pipeline=train_pipeline,
         )
   )
 
 val_dataloader = dict(
-    batch_size=16,
-    num_workers=16,
+    batch_size=4,
+    num_workers=4,
     dataset=dict(
         pipeline=test_pipeline,
         )
