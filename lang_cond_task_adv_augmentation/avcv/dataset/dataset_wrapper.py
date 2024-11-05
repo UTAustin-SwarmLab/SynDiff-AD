@@ -19,6 +19,7 @@ import tensorflow as tf
 import logging
 from mmengine.logging import print_log
 import avcv.dataset.utils as dataset_utils
+from PIL import Image
 
 @TRANSFORMS.register_module()
 class AVResize(Resize):
@@ -160,7 +161,6 @@ class WaymoDatasetMM(BaseSegDataset):
             }
         )
         self.cache = cache
-        
         self.waymo_init(segmentation=segmentation,
                         validation=validation,
                         image_meta_data=image_meta_data)
@@ -404,12 +404,24 @@ class WaymoDatasetMM(BaseSegDataset):
         context_frame = data_info['context_frame']
         camera_id = data_info['camera_id']
         
-        file_name = str(context_name) +"_" +str(context_frame)+"_"+str(camera_id)+".npy"
-        path = os.path.join(self.cache_folder, file_name)
+        folder_name = str(context_name) +"_" +str(context_frame)+"_"+str(camera_id)
+        path = os.path.join(self.cache_folder, folder_name)
         if self.cache:
             if os.path.exists(path):
-                data_info = np.load(path)
-                return data_info
+                if os.path.exists(os.path.join(path,"img.png")) and \
+                    os.path.exists(os.path.join(path,"gt_seg_map.png")) and \
+                    os.path.exists(os.path.join(path,"gt_instance_map.png")) and \
+                    os.path.exists(os.path.join(path,"gt_object_map.png")) and \
+                    os.path.exists(os.path.join(path,"condition.txt")):
+                    data_info['img'] = np.array(Image.open(os.path.join(path,"img.png"))).astype(np.uint8)
+                    data_info['gt_seg_map'] = np.array(Image.open(os.path.join(path,"gt_seg_map.png"))).astype(np.uint8)
+                    data_info['gt_instance_map'] = np.array(Image.open(os.path.join(path,"gt_instance_map.png"))).astype(np.uint8)
+                    data_info['gt_object_map'] = np.array(Image.open(os.path.join(path,"gt_object_map.png"))).astype(np.uint8)
+                    data_info['ori_shape'] = data_info['img'].shape[:2]
+                    with open(os.path.join(path,"condition.txt"), 'r') as f:
+                        data_info['condition'] = f.read()
+                        
+                    return data_info
         
         camera_labels, camera_images, camera_weather, camera_lighting = self.load_data_set_parquet(
                 context_name=context_name, 
@@ -425,7 +437,7 @@ class WaymoDatasetMM(BaseSegDataset):
             # All semantic labels are in the form of object indices defined by the PALLETE
             camera_images = camera_images[0][camera_id]
             object_masks = semantic_labels_multiframe[0][camera_id].astype(np.int64)
-            instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
+            #instance_masks = instance_labels_multiframe[0][camera_id].astype(np.int64)
 
             semantic_mask_rgb = self.get_semantic_mask(object_masks)
             # panoptic_mask_rgb = camera_segmentation_utils.panoptic_label_to_rgb(object_masks,
@@ -442,7 +454,7 @@ class WaymoDatasetMM(BaseSegDataset):
         if self.segmentation:
             data_info['img'] = camera_images
             data_info['gt_seg_map'] = object_masks
-            data_info['gt_instance_map'] = instance_masks
+            data_info['gt_instance_map'] = semantic_mask_rgb.copy()
             data_info['gt_object_map'] = semantic_mask_rgb
             data_info['ori_shape'] = camera_images.shape[:2]
             data_info['condition'] = condition
@@ -456,12 +468,22 @@ class WaymoDatasetMM(BaseSegDataset):
             data_info['condition'] = condition
         
         if self.cache:
+            # All keys
             if not os.path.exists(path):
-                np.save(path, data_info)
+                os.makedirs(path, exist_ok=True)
                 
+                allkeys = ['img', 'gt_seg_map', 'gt_instance_map', 'gt_object_map', 'condition']
+                for k in allkeys:
+                    if 'img' in k or 'map' in k:
+                        storage_path = os.path.join(path,k+".png")
+                        img = Image.fromarray(data_info[k].astype(np.uint8))
+                        img.save(storage_path)
+                    elif k =='condition':
+                        storage_path = os.path.join(path, k+".txt")
+                        with open(storage_path, 'w') as f:
+                            f.write(data_info[k])
         return data_info
  
-    
     def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
         '''
         Returns the semantic mask from the object mask

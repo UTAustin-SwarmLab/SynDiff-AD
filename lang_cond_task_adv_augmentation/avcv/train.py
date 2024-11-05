@@ -67,6 +67,7 @@ class AVTrain:
                         latest_iter = iter
                         latest_path = i
             cfg.load_from = osp.join(loads, latest_path)
+            #cfg.load_from = osp.join(loads, 'last_checkpoint')
         elif 'synth' in train_config.model_name or 'mixed' in train_config.model_name:
             loads = train_config.work_dir + train_config.source_model + args.dir_tag
             latest_path = 0
@@ -131,7 +132,7 @@ def parse_args():
     )
     parser.add_argument(
         '--dir_tag',
-        default='v3',
+        default='',
         help='tag for new directory to save model'
     )
     parser.add_argument(
