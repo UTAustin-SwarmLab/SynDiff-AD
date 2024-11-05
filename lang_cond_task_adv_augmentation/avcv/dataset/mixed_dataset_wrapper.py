@@ -36,7 +36,8 @@ class MixedWaymoDatasetMM(WaymoDatasetMM):
                 reduce_zero_label: bool = False,
                 pipeline:List[Union[dict, Callable]]=None,
                 mixing_ratio:float = 0.5,
-                max_refetch: int = 1000) -> None:
+                max_refetch: int = 1000,
+                cache:bool = True) -> None:
         
         # Create the dataset config from the WaymoDataset config
 
@@ -51,6 +52,7 @@ class MixedWaymoDatasetMM(WaymoDatasetMM):
         )
         self.mixing_ratio = mixing_ratio
         assert self.mixing_ratio < 1.0, "Mixing ratio should be less than 1.0"
+        self.cache = cache
         self.waymo_init(segmentation=segmentation,
                         validation=validation,
                         image_meta_data=image_meta_data)

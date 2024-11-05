@@ -146,7 +146,8 @@ class WaymoDatasetMM(BaseSegDataset):
                 serialize_data:bool = True,
                 reduce_zero_label: bool = False,
                 pipeline:List[Union[dict, Callable]]=None,
-                max_refetch: int = 1000) -> None:
+                max_refetch: int = 1000,
+                cache: bool = True) -> None:
         
         # Create the dataset config from the WaymoDataset config
 
@@ -158,6 +159,8 @@ class WaymoDatasetMM(BaseSegDataset):
                 "SAVE_FRAMES": data_config["SAVE_FRAMES"],
             }
         )
+        self.cache = cache
+        
         self.waymo_init(segmentation=segmentation,
                         validation=validation,
                         image_meta_data=image_meta_data)
@@ -206,9 +209,14 @@ class WaymoDatasetMM(BaseSegDataset):
             if validation:
                 self.FOLDER = self.waymo_config.EVAL_DIR
                 self.contexts_path = os.path.join(self.FOLDER, '2d_pvps_validation_frames.txt')
+                    
             else:
                 self.FOLDER = self.waymo_config.TRAIN_DIR
                 self.contexts_path = os.path.join(self.FOLDER, '2d_pvps_training_frames.txt')
+            
+            if self.cache:
+                self.cache_folder = os.path.join(self.FOLDER, "pvps_cache")
+
         else:
             if validation:
                 self.FOLDER = self.waymo_config.EVAL_DIR
@@ -216,7 +224,13 @@ class WaymoDatasetMM(BaseSegDataset):
             else:
                 self.FOLDER = self.waymo_config.TRAIN_DIR
                 self.contexts_path = os.path.join(self.FOLDER, '2d_detection_training_metadata.txt')
-
+            if self.cache:
+                self.cache_folder = os.path.join(self.FOLDER, "det_cache")
+        
+        if not os.path.exists(self.cache_folder):
+            os.makedirs(self.cache_folder)
+            
+            
         #self.context_set = set()
         self.data_list = []
         #self.segment_frames = dict()
@@ -390,6 +404,13 @@ class WaymoDatasetMM(BaseSegDataset):
         context_frame = data_info['context_frame']
         camera_id = data_info['camera_id']
         
+        file_name = str(context_name) +"_" +str(context_frame)+"_"+str(camera_id)+".npy"
+        path = os.path.join(self.cache_folder, file_name)
+        if self.cache:
+            if os.path.exists(path):
+                data_info = np.load(path)
+                return data_info
+        
         camera_labels, camera_images, camera_weather, camera_lighting = self.load_data_set_parquet(
                 context_name=context_name, 
                 validation=self.validation,
@@ -425,7 +446,7 @@ class WaymoDatasetMM(BaseSegDataset):
             data_info['gt_object_map'] = semantic_mask_rgb
             data_info['ori_shape'] = camera_images.shape[:2]
             data_info['condition'] = condition
-            return data_info
+            
         
         else:
             data_info['img'] = camera_images
@@ -433,7 +454,12 @@ class WaymoDatasetMM(BaseSegDataset):
             data_info['gt_labels'] = box_classes
             data_info['ori_shape'] = camera_images.shape[:2]
             data_info['condition'] = condition
-            return data_info
+        
+        if self.cache:
+            if not os.path.exists(path):
+                np.save(path, data_info)
+                
+        return data_info
  
     
     def get_semantic_mask(self, object_mask: np.ndarray) -> np.ndarray:
