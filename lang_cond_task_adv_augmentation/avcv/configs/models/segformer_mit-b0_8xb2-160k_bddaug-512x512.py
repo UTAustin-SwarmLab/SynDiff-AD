@@ -12,7 +12,6 @@ model = dict(
 
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
-    dict(type='RandomFlip', prob=0.5),
     dict(type='PhotoMetricDistortion'),
     dict(type='PackSegInputs', meta_keys=['file_name',
                                           'ori_shape',

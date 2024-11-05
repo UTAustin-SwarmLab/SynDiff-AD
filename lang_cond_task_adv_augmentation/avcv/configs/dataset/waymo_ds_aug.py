@@ -6,7 +6,6 @@ crop_size = (512, 512)
 num_classes = 29
 train_pipeline = [
     dict(type='AVResize', scale=crop_size, keep_ratio=False),
-    dict(type='RandomFlip', prob=0.5),
     dict(type='PhotoMetricDistortion'),
     dict(type='PackSegInputs', meta_keys=['context_name',
                                           'context_frame',
