@@ -1,0 +1,1 @@
+_base_ = ['./segformer_mit-b3_8xb2-160k_waymoft-512x512.py']

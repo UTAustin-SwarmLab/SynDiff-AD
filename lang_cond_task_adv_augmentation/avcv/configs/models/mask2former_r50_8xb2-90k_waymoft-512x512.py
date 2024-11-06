@@ -1,0 +1,1 @@
+_base_ = ['./mask2former_r50_8xb2-90k_waymo-512x512.py']
