@@ -68,7 +68,7 @@ class AVTrain:
                         latest_path = i
             cfg.load_from = osp.join(loads, latest_path)
             #cfg.load_from = osp.join(loads, 'last_checkpoint')
-        elif 'synth' in train_config.model_name or 'mixed' in train_config.model_name:
+        elif 'synth' in train_config.model_name or 'mixed' in train_config.model_name or 'ft-' in  train_config.model_name or 'aug-' in train_config.model_name :
             loads = train_config.work_dir + train_config.source_model + args.dir_tag
             latest_path = 0
             latest_iter = 0
