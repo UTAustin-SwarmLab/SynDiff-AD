@@ -1,8 +1,8 @@
-model_name: 'mask2former_r50_8xb2-90k_mixedwaymoft-512x512'
+model_name: 'mask2former_r50_8xb2-90k_mixedwaymoaugft-512x512'
 model_config_path: 'avcv/configs/models/'
 load_model_paths: 'avcv/model_weights/mask2former_r50_8xb2-160k_ade20k-512x512_20221204_000055-2d1f55f1.pth'
 work_dir: '/store/harsh/work_dirs/'
-source_model: 'mask2former_r50_8xb2-90k_waymo-512x512'
+source_model: 'mask2former_r50_8xb2-90k_waymoaug-512x512'
 max_iters: 80000
 val_interval: 20000
 logger_interval: 5
