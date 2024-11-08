@@ -32,13 +32,14 @@ class ConditionAVTester:
     
         self.test_config = test_config
         
-        if 'synth' in test_config.model_name \
-            or 'mixed' in test_config.model_name \
-                or 'ft' in test_config.model_name:
-            model_config_path = test_config.model_config_path + test_config.source_model + '.py'
-        else:
-            model_config_path = test_config.model_config_path + test_config.model_name + '.py'
+        # if 'synth' in test_config.model_name \
+        #     or 'mixed' in test_config.model_name \
+        #         or 'ft' in test_config.model_name:
+        #     model_config_path = test_config.model_config_path + test_config.source_model + '.py'
+        # else:
+        #     model_config_path = test_config.model_config_path + test_config.model_name + '.py'
             
+        model_config_path = test_config.model_config_path + test_config.model_name + '.py'
         cfg = Config.fromfile(model_config_path)
         print(f'Config:\n{cfg.pretty_text}')
         cfg.work_dir = test_config.work_dir + test_config.model_name + args.dir_tag + args.add_tag
