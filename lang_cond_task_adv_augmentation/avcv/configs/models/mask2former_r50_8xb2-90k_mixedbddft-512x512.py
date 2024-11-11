@@ -164,7 +164,7 @@ optim_wrapper = dict(
 param_scheduler = [
     dict(
         type='PolyLR',
-        eta_min=0,
+        eta_min=1e-6,
         power=0.9,
         begin=0,
         end=160000,
