@@ -132,13 +132,15 @@ Since the synthetic dataset needs to be produced, checkout the .json files under
 
 ## Citation
 
+```
 @article{goel2024syndiff,
   title={Syndiff-ad: Improving semantic segmentation and end-to-end autonomous driving with synthetic data from latent diffusion models},
   author={Goel, Harsh and Narasimhan, Sai Shankar and Akcin, Oguzhan and Chinchali, Sandeep},
   journal={arXiv preprint arXiv:2411.16776},
   year={2024}
 }
-
+```
+```
 @inproceedings{
 goel2024improving,
 title={Improving End-To-End Autonomous Driving with Synthetic Data from Latent Diffusion Models},
@@ -147,6 +149,6 @@ booktitle={First Vision and Language for Autonomous Driving and Robotics Worksho
 year={2024},
 url={https://openreview.net/forum?id=yaXYQinjOA}
 }
-
+```
 
  
