@@ -1,6 +1,4 @@
-# Python-Project-Template
-
-This is a template repository. Please initialize your python project using this template.
+# SynDiff-AD
 
 1. Please set pythonpath during execution to the lang_cond_task_adv_augmentation folder in the repo before executing scripts see 8.
 
