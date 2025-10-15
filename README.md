@@ -1,4 +1,3 @@
-# SynDiff-AD
 
 # SynDiff-AD: Synthetic Data Generation for Autonomous Driving with Diffusion Models
 
