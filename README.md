@@ -48,6 +48,29 @@ Install and setup mmsegmentation for segmentation experiments
 ```
 Note: Ignore the dependency conflict of numpy 1.21.5 and pip install numpy==1.23.1- works seamlessly
 
+
+## Synthetic Data Generation
+
+The core of this project is the language-driven data synthesis pipeline located in the lang_data_synthesis directory.
+
+Key Scripts:
+
+image_classification.py: Classifies images according to the test conditions specified in lang_data_synthesis/config.yaml.
+
+image_prompting.py: Captions images using LLaVA-1.5 (upgrade pending).
+
+imgseg_synthesis.py: Performs conditional synthesis on a single image using ControlNet.
+
+utils.py: Contains various utility functions for the pipeline.
+
+synthesis.py: The main script to synthesize an entire dataset using ControlNet and the specified target conditions.
+
+test_synthesis.py: Tests a synthesized dataset to produce FID scores with respect to different backbones.
+
+### Example: Use the synthesis script with your CARLA data
+python lang_data_synthesis/synthesis.py --input_dir data/carla_raw --output_dir data/carla_synthetic --config your_synthesis_config.yaml
+
+
 ## Training Segmentation Models
 
 ### 1. Download Pre-trained Models
@@ -102,42 +125,29 @@ python carla_utils/collect_data.py --host localhost --port 2000 --frames 1000 --
 
 ### 4. Testing
 
-### Run Synthesis Pipeline
-Once you have collected the raw data from CARLA, you can use it as input for the SynDiff-AD synthesis pipeline to generate augmented training data.
-
-Bash
-
-# Example: Use the synthesis script with your CARLA data
-python lang_data_synthesis/synthesis.py --input_dir data/carla_raw --output_dir data/carla_synthetic --config your_synthesis_config.yaml
-📊 Viewing Results
-Since the full model weights and generated datasets are not included in this repository, we provide the result files for analysis.
-
-Fine-tuning Results: All results for the fine-tuning experiments are located in the avcv/tests directory. You can explore the compiled results and visualizations by running the results.ipynb notebook located in avcv/experiments.
-
-Synthesis FID Scores: The FID scores for the synthetic dataset generation can be found in the .json files under lang_data_synthesis/synthesis_results.
-
-## Synthetic Data Generation
-
-The core of this project is the language-driven data synthesis pipeline located in the lang_data_synthesis directory.
-
-Key Scripts:
-
-image_classification.py: Classifies images according to the test conditions specified in lang_data_synthesis/config.yaml.
-
-image_prompting.py: Captions images using LLaVA-1.5 (upgrade pending).
-
-imgseg_synthesis.py: Performs conditional synthesis on a single image using ControlNet.
-
-utils.py: Contains various utility functions for the pipeline.
-
-synthesis.py: The main script to synthesize an entire dataset using ControlNet and the specified target conditions.
-
-test_synthesis.py: Tests a synthesized dataset to produce FID scores with respect to different backbones.
 
 
 ### Results
 
 Since the synthetic dataset needs to be produced, checkout the .json files under lang_data_synthesis/synthesis_results for FID scores
+
+## Citation
+
+@article{goel2024syndiff,
+  title={Syndiff-ad: Improving semantic segmentation and end-to-end autonomous driving with synthetic data from latent diffusion models},
+  author={Goel, Harsh and Narasimhan, Sai Shankar and Akcin, Oguzhan and Chinchali, Sandeep},
+  journal={arXiv preprint arXiv:2411.16776},
+  year={2024}
+}
+
+@inproceedings{
+goel2024improving,
+title={Improving End-To-End Autonomous Driving with Synthetic Data from Latent Diffusion Models},
+author={Harsh Goel and Sai Shankar Narasimhan and Sandeep P. Chinchali},
+booktitle={First Vision and Language for Autonomous Driving and Robotics Workshop},
+year={2024},
+url={https://openreview.net/forum?id=yaXYQinjOA}
+}
 
 
  
